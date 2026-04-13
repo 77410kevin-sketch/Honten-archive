@@ -1,0 +1,60 @@
+"""
+Demo 版通知服務 — 印 console log 取代實際 LINE 推播
+正式環境請替換為真實的 LINE Messaging API 呼叫
+"""
+import logging
+logger = logging.getLogger(__name__)
+
+
+async def notify_pcn_submitted(db, form):
+    logger.info(f"[LINE通知-Demo] 送審品保 | {form.form_id} | {form.product_name}")
+    print(f"\n📱 [LINE通知] 【待品保填寫SIP】{form.form_id} - {form.product_name}\n")
+
+
+async def notify_pcn_qc_done(db, form):
+    logger.info(f"[LINE通知-Demo] 品保完成 | {form.form_id}")
+    print(f"\n📱 [LINE通知] 【待產線主管填SOP】{form.form_id} - {form.product_name}\n")
+
+
+async def notify_pcn_prod_done(db, form):
+    logger.info(f"[LINE通知-Demo] 產線完成 | {form.form_id}")
+    print(f"\n📱 [LINE通知] 【待BU審核】{form.form_id} - {form.product_name}\n")
+
+
+async def notify_pcn_approved(db, form):
+    logger.info(f"[LINE通知-Demo] BU核准 | {form.form_id}")
+    print(f"\n📱 [LINE通知] 【✅ PCN/ECN已核准】{form.form_id} - {form.product_name} 通知所有相關人員\n")
+
+
+async def notify_pcn_rejected(db, form, reject_target: str = "提案單位"):
+    logger.info(f"[LINE通知-Demo] BU退回 | {form.form_id} | 退回對象：{reject_target}")
+    print(f"\n📱 [LINE通知] 【⚠️ PCN/ECN退回】{form.form_id} 退回給【{reject_target}】，請修改後重新送審\n")
+
+
+# ── ECN 核准 CC 通知 ─────────────────────────────
+
+async def notify_ecn_approved_tech(db, form):
+    """ECN 技術類（製程/設計/供應商）核准 → CC：工程 + 品保 + 提出單位"""
+    logger.info(f"[LINE通知-Demo] ECN技術類核准 | {form.form_id} | CC→工程、品保、提出單位")
+    print(
+        f"\n📱 [LINE通知-CC] 【✅ ECN技術類核准】{form.form_id} - {form.product_name}\n"
+        f"   CC 通知：工程部門、品保部門、提出單位（{form.department or '—'}）\n"
+    )
+
+
+async def notify_ecn_approved_price(db, form):
+    """ECN 售價變更核准 → CC：提出單位 + 業助 + 人事"""
+    logger.info(f"[LINE通知-Demo] ECN售價變更核准 | {form.form_id} | CC→提出單位、業助、人事")
+    print(
+        f"\n📱 [LINE通知-CC] 【✅ ECN售價變更核准】{form.form_id} - {form.product_name}\n"
+        f"   CC 通知：提出單位（{form.department or '—'}）、業務助理、人事\n"
+    )
+
+
+async def notify_ecn_approved_cost(db, form):
+    """ECN 成本變更核准 → CC：提出單位 + 採購 + 人事 + 業務"""
+    logger.info(f"[LINE通知-Demo] ECN成本變更核准 | {form.form_id} | CC→提出單位、採購、人事、業務")
+    print(
+        f"\n📱 [LINE通知-CC] 【✅ ECN成本變更核准】{form.form_id} - {form.product_name}\n"
+        f"   CC 通知：提出單位（{form.department or '—'}）、採購、人事、業務\n"
+    )

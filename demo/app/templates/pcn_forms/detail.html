@@ -1,0 +1,678 @@
+{% extends "base.html" %}
+{% block title %}{{ form.form_id }}{% endblock %}
+{% block content %}
+<div class="container-fluid py-3">
+
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="/pcn-forms/">PCN/ECN 管理</a></li>
+      <li class="breadcrumb-item active">{{ form.form_id }}</li>
+    </ol>
+  </nav>
+
+  <div class="row g-3">
+
+    {# ═══ 左欄：主表單資訊 ════════════════════════ #}
+    <div class="col-lg-8">
+
+      {# 標題列 #}
+      <div class="card shadow-sm mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center
+          {% if form.status.value == 'APPROVED' %}bg-success text-white
+          {% elif form.status.value == 'RETURNED' %}bg-danger text-white
+          {% elif form.status.value == 'CLOSED' %}bg-dark text-white
+          {% elif form.status.value == 'PENDING_BU_APPROVAL' %}bg-warning text-dark
+          {% else %}bg-primary text-white{% endif %}">
+          <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-arrow-repeat fs-5"></i>
+            <span class="fw-bold fs-6">{{ form.form_id }}</span>
+            {% if form.type.value == 'PCN' %}
+              <span class="badge bg-white text-primary">PCN</span>
+            {% else %}
+              <span class="badge bg-white text-warning">ECN</span>
+            {% endif %}
+          </div>
+          <div>
+            {% if form.status.value == 'DRAFT' %}
+              <span class="badge bg-light text-dark fs-6">草稿</span>
+            {% elif form.status.value == 'ECN_PENDING_ENG' %}
+              <span class="badge bg-light fs-6" style="color:#0d6efd">ECN 待工程確認</span>
+            {% elif form.status.value == 'ECN_PENDING_QC' %}
+              <span class="badge bg-light fs-6" style="color:#6f42c1">ECN 待品保確認</span>
+            {% elif form.status.value == 'PENDING_QC' %}
+              <span class="badge bg-light text-primary fs-6">PCN 待品保</span>
+            {% elif form.status.value == 'PENDING_PRODUCTION' %}
+              <span class="badge bg-light text-info fs-6">PCN 待產線主管</span>
+            {% elif form.status.value == 'PENDING_BU_APPROVAL' %}
+              <span class="badge bg-light text-warning fs-6">待 BU 審核</span>
+            {% elif form.status.value == 'APPROVED' %}
+              <span class="badge bg-light text-success fs-6">已核准</span>
+            {% elif form.status.value == 'RETURNED' %}
+              <span class="badge bg-light text-danger fs-6">退回</span>
+            {% elif form.status.value == 'CLOSED' %}
+              <span class="badge bg-light text-dark fs-6">結案</span>
+            {% endif %}
+          </div>
+        </div>
+
+        {# 流程進度條（依表單類型和變更類型顯示不同步驟）#}
+        <div class="card-body pb-2">
+          {% if form.type.value == 'PCN' %}
+            {# PCN 流程 #}
+            {% set steps = [
+              ('DRAFT', '草稿', 'bi-pencil'),
+              ('PENDING_QC', '品保 SIP', 'bi-clipboard2-check'),
+              ('PENDING_PRODUCTION', '產線 SOP', 'bi-tools'),
+              ('PENDING_BU_APPROVAL', 'BU 審核', 'bi-person-check'),
+              ('APPROVED', '核准', 'bi-check-circle'),
+            ] %}
+            {% set status_order = ['DRAFT','PENDING_QC','PENDING_PRODUCTION','PENDING_BU_APPROVAL','APPROVED','CLOSED'] %}
+          {% elif ecn_tech_review %}
+            {# ECN 技術類流程 #}
+            {% set steps = [
+              ('DRAFT', '草稿', 'bi-pencil'),
+              ('ECN_PENDING_ENG', '工程確認', 'bi-wrench'),
+              ('ECN_PENDING_QC', '品保確認', 'bi-clipboard2-check'),
+              ('PENDING_BU_APPROVAL', 'BU 審核', 'bi-person-check'),
+              ('APPROVED', '核准', 'bi-check-circle'),
+            ] %}
+            {% set status_order = ['DRAFT','ECN_PENDING_ENG','ECN_PENDING_QC','PENDING_BU_APPROVAL','APPROVED','CLOSED'] %}
+          {% else %}
+            {# ECN 商業類流程 #}
+            {% set steps = [
+              ('DRAFT', '草稿', 'bi-pencil'),
+              ('PENDING_BU_APPROVAL', 'BU 審核', 'bi-person-check'),
+              ('APPROVED', '核准', 'bi-check-circle'),
+            ] %}
+            {% set status_order = ['DRAFT','PENDING_BU_APPROVAL','APPROVED','CLOSED'] %}
+          {% endif %}
+          {% set cur_idx = status_order.index(form.status.value) if form.status.value in status_order else 0 %}
+
+          <div class="d-flex justify-content-between align-items-center position-relative px-2 py-2" style="overflow-x:auto">
+            <div class="position-absolute top-50 start-0 end-0 border-top border-2 border-secondary-subtle" style="z-index:0;margin-top:-1px"></div>
+            {% for s, label, icon in steps %}
+              {% set s_idx = status_order.index(s) %}
+              <div class="d-flex flex-column align-items-center position-relative" style="z-index:1;min-width:70px">
+                <div class="rounded-circle d-flex align-items-center justify-content-center border border-2
+                  {% if form.status.value == 'RETURNED' and s_idx == cur_idx %}border-danger bg-danger text-white
+                  {% elif s_idx < cur_idx %}border-success bg-success text-white
+                  {% elif s_idx == cur_idx %}border-primary bg-primary text-white
+                  {% else %}border-secondary bg-white text-secondary{% endif %}"
+                  style="width:38px;height:38px">
+                  <i class="bi {{ icon }} small"></i>
+                </div>
+                <small class="mt-1 text-center" style="font-size:0.7rem;line-height:1.2">{{ label }}</small>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      {# 表單詳情 #}
+      <div class="card shadow-sm mb-3">
+        <div class="card-header bg-light fw-semibold">
+          <i class="bi bi-info-circle me-2 text-primary"></i>變更資訊
+        </div>
+        <div class="card-body">
+          <div class="row g-2 mb-3">
+            <div class="col-sm-4"><span class="text-muted small">提出部門</span><div class="fw-semibold">{{ form.department or '—' }}</div></div>
+            <div class="col-sm-4"><span class="text-muted small">廠內產品料號</span><div class="fw-semibold">{% for pn in form.product_name.split('\n') %}{% if pn.strip() %}<span class="badge bg-secondary me-1 mb-1">{{ pn.strip() }}</span>{% endif %}{% endfor %}</div></div>
+            <div class="col-sm-4"><span class="text-muted small">機種名稱</span><div>{{ form.product_model or '—' }}</div></div>
+          </div>
+          {% if form.type.value == 'ECN' and change_types_list %}
+          <div class="mb-3">
+            <span class="text-muted small">ECN 變更類型</span>
+            <div class="mt-1 d-flex flex-wrap gap-1">
+              {% set tech_set = ['製程變更', '設計變更', '供應商變更'] %}
+              {% for ct in change_types_list %}
+                {% if ct in tech_set %}
+                  <span class="badge bg-info text-dark"><i class="bi bi-gear me-1"></i>{{ ct }}</span>
+                {% else %}
+                  <span class="badge bg-warning text-dark"><i class="bi bi-currency-dollar me-1"></i>{{ ct }}</span>
+                {% endif %}
+              {% endfor %}
+              {% if ecn_tech_review %}
+                <span class="ms-2 badge border border-info text-info" style="font-size:0.7rem">
+                  <i class="bi bi-arrow-right me-1"></i>需工程+品保確認
+                </span>
+              {% else %}
+                <span class="ms-2 badge border border-warning text-warning" style="font-size:0.7rem">
+                  <i class="bi bi-lightning-charge me-1"></i>直送BU審核
+                </span>
+              {% endif %}
+            </div>
+          </div>
+          {% endif %}
+          <div class="row g-2 mb-3">
+            <div class="col-sm-4"><span class="text-muted small">建單者</span><div>{{ form.creator.display_name if form.creator else '—' }}</div></div>
+            <div class="col-sm-4"><span class="text-muted small">預計生效日期</span><div>{{ form.effective_date or '—' }}</div></div>
+            <div class="col-sm-4"><span class="text-muted small">建立日期</span><div>{{ form.created_at.strftime('%Y-%m-%d %H:%M') }}</div></div>
+          </div>
+          <hr class="my-2">
+          <div class="mb-3">
+            <span class="text-muted small">變更說明</span>
+            <div class="mt-1 p-2 bg-light rounded" style="white-space:pre-wrap">{{ form.change_description }}</div>
+          </div>
+          {% if form.change_reason %}
+          <div class="mb-2">
+            <span class="text-muted small">變更原因</span>
+            <div class="mt-1 p-2 bg-light rounded" style="white-space:pre-wrap">{{ form.change_reason }}</div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      {# 各階段意見 #}
+      <div class="card shadow-sm mb-3">
+        <div class="card-header bg-light fw-semibold">
+          <i class="bi bi-people me-2 text-info"></i>各階段確認意見
+        </div>
+        <div class="card-body">
+          {% if form.type.value == 'ECN' and ecn_tech_review %}
+          {# ECN 技術類：工程意見 + 品保意見 #}
+          <div class="row g-3">
+            <div class="col-md-6">
+              <div class="border rounded p-3">
+                <div class="fw-semibold mb-1"><i class="bi bi-wrench me-1 text-primary"></i>工程確認意見</div>
+                {% set eng_apv = form.approvals | selectattr('action', 'equalto', 'ENG_CONFIRM') | list | last %}
+                {% if eng_apv %}
+                  <div class="text-muted small mb-1">{{ eng_apv.approver.display_name if eng_apv.approver else '—' }}・{{ eng_apv.created_at.strftime('%Y-%m-%d') }}</div>
+                  {% if eng_apv.comment %}
+                  <div class="p-2 bg-light rounded small" style="white-space:pre-wrap">{{ eng_apv.comment }}</div>
+                  {% else %}
+                  <div class="text-muted small">（無意見）</div>
+                  {% endif %}
+                {% else %}
+                  <div class="text-muted small">尚未確認</div>
+                {% endif %}
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="border rounded p-3">
+                <div class="fw-semibold mb-1"><i class="bi bi-clipboard2-check me-1" style="color:#6f42c1"></i>品保確認意見</div>
+                {% set qc_apv = form.approvals | selectattr('action', 'equalto', 'ECN_QC_CONFIRM') | list | last %}
+                {% if qc_apv %}
+                  <div class="text-muted small mb-1">{{ qc_apv.approver.display_name if qc_apv.approver else '—' }}・{{ qc_apv.created_at.strftime('%Y-%m-%d') }}</div>
+                  {% if qc_apv.comment %}
+                  <div class="p-2 bg-light rounded small" style="white-space:pre-wrap">{{ qc_apv.comment }}</div>
+                  {% else %}
+                  <div class="text-muted small">（無意見）</div>
+                  {% endif %}
+                {% else %}
+                  <div class="text-muted small">尚未確認</div>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+          {% elif form.type.value == 'PCN' %}
+          {# PCN：品保 SIP + 產線 SOP #}
+          <div class="row g-3">
+            <div class="col-md-6">
+              <div class="border rounded p-3">
+                <div class="fw-semibold mb-1"><i class="bi bi-clipboard2-check me-1 text-primary"></i>品保（SIP 檢表）</div>
+                {% if form.qc_comment %}
+                <div class="p-2 bg-light rounded small" style="white-space:pre-wrap">{{ form.qc_comment }}</div>
+                {% else %}
+                <div class="text-muted small">尚未填寫</div>
+                {% endif %}
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="border rounded p-3">
+                <div class="fw-semibold mb-1"><i class="bi bi-tools me-1 text-warning"></i>產線主管（SOP）</div>
+                {% if form.prod_comment %}
+                <div class="p-2 bg-light rounded small" style="white-space:pre-wrap">{{ form.prod_comment }}</div>
+                {% else %}
+                <div class="text-muted small">尚未填寫</div>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+          {% else %}
+          {# ECN 商業類：直送BU，無工程品保意見 #}
+          <div class="text-muted small text-center py-2">
+            <i class="bi bi-lightning-charge me-1 text-warning"></i>商業類變更，直接由 BU Head 審核，無需工程與品保確認
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      {# ECN 工程確認操作區 #}
+      {% if form.status.value == 'ECN_PENDING_ENG' and user.role.value in ('engineer', 'admin') %}
+      <div class="card shadow-sm mb-3 border-primary">
+        <div class="card-header text-white fw-semibold" style="background:#0d6efd">
+          <i class="bi bi-wrench me-2"></i>工程確認作業區 — 填寫意見後確認
+        </div>
+        <div class="card-body">
+          <div class="alert alert-info small mb-3">
+            <i class="bi bi-info-circle me-1"></i>
+            請工程師確認此 ECN 的技術可行性，填寫確認意見後交由<strong>品保</strong>複核。
+          </div>
+          <form method="post" action="/pcn-forms/{{ form.form_id }}/ecn-eng-confirm">
+            <div class="mb-3">
+              <label class="form-label fw-semibold">工程確認意見 <span class="text-muted fw-normal">(選填)</span></label>
+              <textarea name="comment" class="form-control" rows="4"
+                placeholder="請填寫技術評估意見、可行性分析、注意事項等..."></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary"
+              onclick="return confirm('確認工程審查完成，送交品保確認？')">
+              <i class="bi bi-check-lg me-1"></i>工程確認完成，送品保
+            </button>
+          </form>
+        </div>
+      </div>
+      {% endif %}
+
+      {# ECN 品保確認操作區 #}
+      {% if form.status.value == 'ECN_PENDING_QC' and user.role.value in ('qc', 'admin') %}
+      <div class="card shadow-sm mb-3" style="border-color:#6f42c1!important">
+        <div class="card-header text-white fw-semibold" style="background:#6f42c1">
+          <i class="bi bi-clipboard2-check me-2"></i>品保確認作業區 — 填寫意見後確認
+        </div>
+        <div class="card-body">
+          <div class="alert small mb-3" style="background:#f0ebff;border-color:#6f42c1;color:#4a2480">
+            <i class="bi bi-info-circle me-1"></i>
+            工程師已確認技術可行性，請品保評估品質影響並填寫確認意見後送交 <strong>BU Head 審核</strong>。
+          </div>
+          {# 顯示工程確認意見供參考 #}
+          {% set eng_approval = form.approvals | selectattr('action', 'equalto', 'ENG_CONFIRM') | list | last %}
+          {% if eng_approval and eng_approval.comment %}
+          <div class="mb-3 p-2 border rounded bg-light small">
+            <div class="text-muted mb-1"><i class="bi bi-wrench me-1"></i>工程確認意見（{{ eng_approval.approver.display_name if eng_approval.approver else '—' }}）</div>
+            <div style="white-space:pre-wrap">{{ eng_approval.comment }}</div>
+          </div>
+          {% endif %}
+          <form method="post" action="/pcn-forms/{{ form.form_id }}/ecn-qc-confirm">
+            <div class="mb-3">
+              <label class="form-label fw-semibold">品保確認意見 <span class="text-muted fw-normal">(選填)</span></label>
+              <textarea name="comment" class="form-control" rows="4"
+                placeholder="請填寫品質影響評估、SIP 調整建議、確認結論等..."></textarea>
+            </div>
+            <button type="submit" class="btn text-white"
+              style="background:#6f42c1"
+              onclick="return confirm('確認品保審查完成，送交 BU Head 審核？')">
+              <i class="bi bi-check-lg me-1"></i>品保確認完成，送 BU 審核
+            </button>
+          </form>
+        </div>
+      </div>
+      {% endif %}
+
+      {# PCN 品保上傳 SIP 操作區（品保角色才看到）#}
+      {% if form.status.value == 'PENDING_QC' and user.role.value in ('qc', 'admin') %}
+      <div class="card shadow-sm mb-3 border-primary">
+        <div class="card-header bg-primary text-white fw-semibold">
+          <i class="bi bi-clipboard2-check me-2"></i>品保作業區 — 上傳 SIP 檢表並完成
+        </div>
+        <div class="card-body">
+          {# 上傳 SIP #}
+          <form method="post" action="/pcn-forms/{{ form.form_id }}/upload-qc" enctype="multipart/form-data" class="mb-3">
+            <label class="form-label fw-semibold">上傳 SIP 檢表 <span class="text-danger">*</span></label>
+            <div class="d-flex gap-2 mb-2">
+              <input type="file" name="attach_files" class="form-control" required>
+              <input type="hidden" name="attach_categories" value="SIP檢表">
+              <button type="submit" class="btn btn-outline-primary text-nowrap">
+                <i class="bi bi-upload me-1"></i>上傳
+              </button>
+            </div>
+          </form>
+          {# 完成按鈕 #}
+          <form method="post" action="/pcn-forms/{{ form.form_id }}/qc-done">
+            <div class="mb-2">
+              <label class="form-label fw-semibold">品保意見（選填）</label>
+              <textarea name="comment" class="form-control" rows="2" placeholder="品保審查意見..."></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary"
+              onclick="return confirm('確認品保作業完成，送交產線主管？')">
+              <i class="bi bi-check-lg me-1"></i>品保完成，送產線主管
+            </button>
+          </form>
+        </div>
+      </div>
+      {% endif %}
+
+      {# 產線主管上傳 SOP 操作區 #}
+      {% if form.status.value == 'PENDING_PRODUCTION' and user.role.value in ('prod_mgr', 'admin') %}
+      <div class="card shadow-sm mb-3 border-info">
+        <div class="card-header bg-info text-dark fw-semibold">
+          <i class="bi bi-tools me-2"></i>產線主管作業區 — 上傳 SOP 並完成
+        </div>
+        <div class="card-body">
+          {# 上傳 SOP #}
+          <form method="post" action="/pcn-forms/{{ form.form_id }}/upload-prod" enctype="multipart/form-data" class="mb-3">
+            <div class="row g-2 mb-2">
+              <div class="col-md-6">
+                <label class="form-label fw-semibold small">作業 SOP <span class="text-danger">*</span></label>
+                <div class="d-flex gap-2">
+                  <input type="file" name="attach_files" class="form-control">
+                  <input type="hidden" name="attach_categories" value="作業SOP">
+                </div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold small">包裝 SOP <span class="text-danger">*</span></label>
+                <div class="d-flex gap-2">
+                  <input type="file" name="attach_files" class="form-control">
+                  <input type="hidden" name="attach_categories" value="包裝SOP">
+                </div>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-outline-info text-dark">
+              <i class="bi bi-upload me-1"></i>上傳 SOP
+            </button>
+          </form>
+          {# 完成按鈕 #}
+          <form method="post" action="/pcn-forms/{{ form.form_id }}/prod-done">
+            <div class="mb-2">
+              <label class="form-label fw-semibold">產線意見（選填）</label>
+              <textarea name="comment" class="form-control" rows="2" placeholder="產線審查意見..."></textarea>
+            </div>
+            <button type="submit" class="btn btn-info text-dark"
+              onclick="return confirm('確認產線作業完成，送交 BU Head 審核？')">
+              <i class="bi bi-check-lg me-1"></i>產線完成，送 BU 審核
+            </button>
+          </form>
+        </div>
+      </div>
+      {% endif %}
+
+      {# 簽核紀錄 #}
+      {% if form.approvals %}
+      <div class="card shadow-sm">
+        <div class="card-header bg-light fw-semibold">
+          <i class="bi bi-journal-text me-2 text-secondary"></i>簽核紀錄
+        </div>
+        <div class="card-body p-0">
+          <ul class="list-group list-group-flush">
+            {% for apv in form.approvals %}
+            {% set combo_key = (apv.from_status or '') + '→' + (apv.to_status or '') %}
+            {% set tl = transition_combo.get(combo_key, (apv.action, 'secondary')) %}
+            <li class="list-group-item">
+              <div class="d-flex justify-content-between align-items-start">
+                <div>
+                  <span class="badge bg-{{ tl[1] }} me-2">{{ tl[0] }}</span>
+                  <strong>{{ apv.approver.display_name if apv.approver else '—' }}</strong>
+                  {% if apv.action == 'REJECT' and apv.reject_target %}
+                  <span class="badge bg-danger ms-1 small">退回給：{{ apv.reject_target }}</span>
+                  {% endif %}
+                  {% if apv.comment %}
+                  <div class="mt-1 text-muted small" style="white-space:pre-wrap">{{ apv.comment }}</div>
+                  {% endif %}
+                </div>
+                <small class="text-muted text-nowrap ms-3">{{ apv.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+              </div>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+      {% endif %}
+
+    </div>{# end col-lg-8 #}
+
+    {# ═══ 右欄：附件 + 操作按鈕 ════════════════════ #}
+    <div class="col-lg-4">
+
+      {# 操作按鈕 #}
+      <div class="card shadow-sm mb-3">
+        <div class="card-header bg-light fw-semibold">
+          <i class="bi bi-lightning-charge me-2 text-warning"></i>操作
+        </div>
+        <div class="card-body d-grid gap-2">
+
+          {# 編輯（草稿/退回 + 建單者/admin）#}
+          {% if form.status.value in ('DRAFT', 'RETURNED') and (user.role.value == 'admin' or form.created_by == user.id) %}
+          <a href="/pcn-forms/{{ form.form_id }}/edit" class="btn btn-outline-warning">
+            <i class="bi bi-pencil me-1"></i>編輯
+          </a>
+          {% endif %}
+
+          {# 送審（草稿/退回 + 建單者）#}
+          {% if form.status.value in ('DRAFT', 'RETURNED') and (user.role.value == 'admin' or form.created_by == user.id) %}
+          <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#submitModal">
+            <i class="bi bi-send me-1"></i>
+            {% if form.type.value == 'ECN' %}
+              {% if ecn_tech_review %}送審（工程確認）{% else %}送審（直送 BU）{% endif %}
+            {% else %}送審（送品保）{% endif %}
+          </button>
+          {% endif %}
+
+          {# BU Head 核准/退回 #}
+          {% if form.status.value == 'PENDING_BU_APPROVAL' and user.role.value in ('bu', 'admin') %}
+          <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#approveModal">
+            <i class="bi bi-check-circle me-1"></i>核准
+          </button>
+          <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#rejectModal">
+            <i class="bi bi-x-circle me-1"></i>退回
+          </button>
+          {% endif %}
+
+          {# 結案（核准後 + 建單者/admin）#}
+          {% if form.status.value == 'APPROVED' and (user.role.value == 'admin' or form.created_by == user.id) %}
+          <button class="btn btn-dark" data-bs-toggle="modal" data-bs-target="#closeModal">
+            <i class="bi bi-archive me-1"></i>結案
+          </button>
+          {% endif %}
+
+          <a href="/pcn-forms/" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>返回列表
+          </a>
+        </div>
+      </div>
+
+      {# 附件清單 #}
+      <div class="card shadow-sm">
+        <div class="card-header bg-light fw-semibold">
+          <i class="bi bi-paperclip me-2 text-secondary"></i>附件
+        </div>
+        <div class="card-body">
+          {% set categories_order = ['圖面/報價單', '料號BOM途程', 'SIP檢表', '作業SOP', '包裝SOP', '其它'] %}
+          {% set cat_icons = {'圖面/報價單': 'bi-file-earmark-image text-primary', '料號BOM途程': 'bi-grid-3x3 text-warning', 'SIP檢表': 'bi-clipboard2-check text-success', '作業SOP': 'bi-tools text-warning', '包裝SOP': 'bi-box-seam text-info', '其它': 'bi-paperclip text-secondary'} %}
+
+          {% set has_any = false %}
+          {% for cat in categories_order %}
+            {% if cat in docs_by_cat %}
+            {% set has_any = true %}
+            <div class="mb-3">
+              <div class="small fw-semibold text-muted mb-1">
+                <i class="bi {{ cat_icons.get(cat, 'bi-file') }} me-1"></i>{{ cat }}
+                {% if cat == '圖面' %}<span class="text-danger">*</span>{% endif %}
+                {% if cat == 'SIP檢表' %}<span class="text-danger">*</span>{% endif %}
+                {% if cat == '作業SOP' %}<span class="text-danger">*</span>{% endif %}
+                {% if cat == '包裝SOP' %}<span class="text-danger">*</span>{% endif %}
+              </div>
+              {% for doc in docs_by_cat[cat] %}
+              <div class="d-flex align-items-center gap-1 mb-1">
+                <a href="/pcn-forms/doc/preview/{{ doc.id }}" target="_blank"
+                   class="text-decoration-none text-truncate small flex-grow-1"
+                   title="{{ doc.original_name }}">
+                  {{ doc.original_name }}
+                </a>
+                <small class="text-muted text-nowrap">{{ doc.uploaded_at.strftime('%m/%d') }}</small>
+              </div>
+              {% endfor %}
+            </div>
+            {% endif %}
+          {% endfor %}
+
+          {% if not docs_by_cat %}
+          <div class="text-muted small text-center py-2">尚無附件</div>
+          {% endif %}
+
+          {# 附件狀態提示 #}
+          {% set has_drawing = '圖面' in docs_by_cat %}
+          {% set has_sip = 'SIP檢表' in docs_by_cat %}
+          {% set has_sop_work = '作業SOP' in docs_by_cat %}
+          {% set has_sop_pack = '包裝SOP' in docs_by_cat %}
+          <hr class="my-2">
+          <div class="small">
+            <div class="d-flex gap-1 align-items-center mb-1">
+              <i class="bi bi-{{ 'check-circle-fill text-success' if has_drawing else 'x-circle text-danger' }}"></i>
+              <span class="{{ '' if has_drawing else 'text-danger' }}">圖面</span>
+            </div>
+            <div class="d-flex gap-1 align-items-center mb-1">
+              <i class="bi bi-{{ 'check-circle-fill text-success' if has_sip else 'dash-circle text-muted' }}"></i>
+              <span class="{{ '' if has_sip else 'text-muted' }}">SIP 檢表</span>
+            </div>
+            <div class="d-flex gap-1 align-items-center mb-1">
+              <i class="bi bi-{{ 'check-circle-fill text-success' if has_sop_work else 'dash-circle text-muted' }}"></i>
+              <span class="{{ '' if has_sop_work else 'text-muted' }}">作業 SOP</span>
+            </div>
+            <div class="d-flex gap-1 align-items-center">
+              <i class="bi bi-{{ 'check-circle-fill text-success' if has_sop_pack else 'dash-circle text-muted' }}"></i>
+              <span class="{{ '' if has_sop_pack else 'text-muted' }}">包裝 SOP</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>{# end col-lg-4 #}
+  </div>{# end row #}
+</div>
+
+{# ────── Modals ────── #}
+
+{# 送審 Modal #}
+<div class="modal fade" id="submitModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="post" action="/pcn-forms/{{ form.form_id }}/submit">
+      <div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title"><i class="bi bi-send me-2"></i>送審確認</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          {% if form.type.value == 'ECN' %}
+            {% if ecn_tech_review %}
+            <div class="alert alert-info small mb-3">
+              <i class="bi bi-info-circle me-1"></i>
+              此 ECN 包含<strong>技術類變更</strong>，送審後流程：<br>
+              <strong>工程師確認意見</strong> → <strong>品保確認意見</strong> → <strong>BU Head 審核</strong>
+            </div>
+            {% else %}
+            <div class="alert alert-warning small mb-3">
+              <i class="bi bi-lightning-charge me-1"></i>
+              此 ECN 為<strong>商業類變更</strong>（售價/成本），送審後將直接送交 <strong>BU Head 審核</strong>，無需工程與品保確認。
+            </div>
+            {% endif %}
+          {% else %}
+          <div class="alert alert-info small mb-3">
+            送審後將通知<strong>品保人員</strong>填寫 SIP 檢表，再由<strong>產線主管</strong>填寫 SOP。<br>
+            ⚠ 請確認已上傳<strong>圖面/報價單</strong>附件。
+          </div>
+          {% endif %}
+          <label class="form-label fw-semibold">備註（選填）</label>
+          <textarea name="comment" class="form-control" rows="3" placeholder="補充說明..."></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-send me-1"></i>確認送審</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# BU 核准 Modal #}
+<div class="modal fade" id="approveModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="post" action="/pcn-forms/{{ form.form_id }}/approve">
+      <div class="modal-content">
+        <div class="modal-header bg-success text-white">
+          <h5 class="modal-title"><i class="bi bi-check-circle me-2"></i>核准確認</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          {# CC 通知預覽 #}
+          {% if form.type.value == 'ECN' %}
+            <div class="alert alert-success small mb-3">
+              <div class="fw-semibold mb-2"><i class="bi bi-megaphone me-1"></i>核准後 LINE 推播 CC：</div>
+              <ul class="mb-0 ps-3">
+                {% if ecn_tech_review %}
+                <li>技術類 → <strong>工程部門、品保部門、提出單位</strong></li>
+                {% endif %}
+                {% if '售價變更' in change_types_list %}
+                <li>售價變更 → <strong>提出單位、業務助理、人事</strong></li>
+                {% endif %}
+                {% if '成本變更' in change_types_list %}
+                <li>成本變更 → <strong>提出單位、採購、人事、業務</strong></li>
+                {% endif %}
+                {% if not change_types_list %}
+                <li>通知所有相關人員</li>
+                {% endif %}
+              </ul>
+            </div>
+          {% else %}
+          <div class="alert alert-success small mb-3">
+            核准後將以 <strong>LINE 推播</strong>通知相關單位（工程師、品保、產線主管）。
+          </div>
+          {% endif %}
+          <label class="form-label fw-semibold">審核意見（選填）</label>
+          <textarea name="comment" class="form-control" rows="3" placeholder="核准意見..."></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-success"><i class="bi bi-check-lg me-1"></i>確認核准</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# BU 退回 Modal #}
+<div class="modal fade" id="rejectModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="post" action="/pcn-forms/{{ form.form_id }}/reject">
+      <div class="modal-content">
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title"><i class="bi bi-x-circle me-2"></i>退回確認</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">退回對象 <span class="text-danger">*</span></label>
+            <select name="reject_target" class="form-select" required>
+              {% if form.type.value == 'ECN' and ecn_tech_review %}
+              <option value="工程師">工程師（重新確認技術可行性）</option>
+              <option value="品保">品保（重新確認品質影響）</option>
+              {% endif %}
+              <option value="提案單位" {% if not (form.type.value == 'ECN' and ecn_tech_review) %}selected{% endif %}>提案單位（修改後重新送審）</option>
+            </select>
+          </div>
+          <div class="mb-1">
+            <label class="form-label fw-semibold">退回原因 <span class="text-danger">*</span></label>
+            <textarea name="comment" class="form-control" rows="3" placeholder="請說明退回原因..." required></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-danger"><i class="bi bi-x-lg me-1"></i>確認退回</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# 結案 Modal #}
+<div class="modal fade" id="closeModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="post" action="/pcn-forms/{{ form.form_id }}/close">
+      <div class="modal-content">
+        <div class="modal-header bg-dark text-white">
+          <h5 class="modal-title"><i class="bi bi-archive me-2"></i>結案確認</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-secondary small">確認此 PCN/ECN 所有作業已完成，執行結案。</div>
+          <label class="form-label fw-semibold">結案備註（選填）</label>
+          <textarea name="comment" class="form-control" rows="2"></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-dark"><i class="bi bi-archive me-1"></i>確認結案</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

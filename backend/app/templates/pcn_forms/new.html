@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block title %}新建 PCN/ECN{% endblock %}
+{% block content %}
+<div class="container py-3" style="max-width:860px">
+
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="/pcn-forms/">PCN/ECN 管理</a></li>
+      <li class="breadcrumb-item active">新建</li>
+    </ol>
+  </nav>
+
+  <div class="card shadow-sm">
+    <div class="card-header bg-primary text-white">
+      <i class="bi bi-plus-circle me-2"></i>新建 PCN/ECN 變更單
+    </div>
+    <div class="card-body">
+      <form method="post" action="/pcn-forms/new" enctype="multipart/form-data" id="pcnForm">
+
+        {# ── 基本資訊 ── #}
+        <h6 class="fw-bold text-secondary border-bottom pb-1 mb-3">基本資訊</h6>
+        <div class="row g-3 mb-3">
+          <div class="col-md-4">
+            <label class="form-label fw-semibold">類型 <span class="text-danger">*</span></label>
+            <select name="pcn_type" class="form-select" required>
+              <option value="PCN">PCN — 開發轉量產</option>
+              <option value="ECN">ECN — 產品工程變更</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-semibold">事業部 <span class="text-danger">*</span></label>
+            <select name="bu" class="form-select" required>
+              <option value="">— 請選擇 —</option>
+              {% for b in BU %}
+              <option value="{{ b.value }}">{{ b.value }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-semibold">預計生效日期</label>
+            <input type="date" name="effective_date" class="form-control">
+          </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">產品名稱 <span class="text-danger">*</span></label>
+            <input type="text" name="product_name" class="form-control" placeholder="例：5.5kW 儲能逆變器" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">產品型號</label>
+            <input type="text" name="product_model" class="form-control" placeholder="例：HT-ESS-5500">
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">變更說明 <span class="text-danger">*</span></label>
+          <textarea name="change_description" class="form-control" rows="4"
+            placeholder="詳細說明本次 PCN/ECN 的變更內容..." required></textarea>
+        </div>
+
+        <div class="mb-4">
+          <label class="form-label fw-semibold">變更原因</label>
+          <textarea name="change_reason" class="form-control" rows="2"
+            placeholder="為什麼需要此次變更？"></textarea>
+        </div>
+
+        {# ── 指派人員 ── #}
+        <h6 class="fw-bold text-secondary border-bottom pb-1 mb-3">指派人員</h6>
+        <div class="row g-3 mb-4">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">指定品保人員</label>
+            <select name="assigned_qc_id" class="form-select">
+              <option value="">— 由品保自行認領 —</option>
+              {% for u in qc_users %}
+              <option value="{{ u.id }}">{{ u.display_name }} ({{ u.username }})</option>
+              {% endfor %}
+            </select>
+            <div class="form-text">若不指定，品保部門自行處理</div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">指定產線主管</label>
+            <select name="assigned_prod_mgr_id" class="form-select">
+              <option value="">— 由產線主管自行認領 —</option>
+              {% for u in pm_users %}
+              <option value="{{ u.id }}">{{ u.display_name }} ({{ u.username }})</option>
+              {% endfor %}
+            </select>
+            <div class="form-text">若不指定，產線主管自行處理</div>
+          </div>
+        </div>
+
+        {# ── 附件上傳（工程圖面）── #}
+        <h6 class="fw-bold text-secondary border-bottom pb-1 mb-3">
+          附件 <span class="text-muted fw-normal small">（圖面為送審必要文件）</span>
+        </h6>
+
+        {# 圖面區塊 #}
+        <div class="mb-3 p-3 border rounded bg-light">
+          <label class="form-label fw-semibold"><i class="bi bi-file-earmark-image me-1 text-primary"></i>圖面 <span class="text-danger">*</span></label>
+          <div id="drawing-zone">
+            <div class="drawing-row d-flex gap-2 mb-2 align-items-center">
+              <input type="file" class="form-control" id="drawing-file-0"
+                     onchange="addDrawingFile(this)">
+              <input type="hidden" name="attach_categories" value="圖面" class="cat-input-drawing">
+            </div>
+          </div>
+          <small class="text-muted">可上傳多個圖面檔案（PDF、DWG、PNG…）</small>
+        </div>
+
+        {# 其它附件 #}
+        <div class="mb-4 p-3 border rounded bg-light">
+          <label class="form-label fw-semibold"><i class="bi bi-paperclip me-1 text-secondary"></i>其它附件（選填）</label>
+          <div id="other-zone">
+            <div class="other-row d-flex gap-2 mb-2 align-items-center">
+              <input type="file" name="attach_files" class="form-control other-file">
+              <input type="hidden" name="attach_categories" value="其它" class="cat-input-other">
+              <button type="button" class="btn btn-sm btn-outline-secondary" onclick="addOtherRow(this)">
+                <i class="bi bi-plus"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-floppy me-1"></i>儲存草稿
+          </button>
+          <a href="/pcn-forms/" class="btn btn-outline-secondary">取消</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+// 動態新增圖面檔案行
+let drawingCount = 1;
+function addDrawingFile(input) {
+  if (!input.files[0]) return;
+  // 將第一個 input 的 name 加上去
+  input.name = 'attach_files';
+  // 再加一個新的空 input
+  const zone = document.getElementById('drawing-zone');
+  const row = document.createElement('div');
+  row.className = 'drawing-row d-flex gap-2 mb-2 align-items-center';
+  row.innerHTML = `
+    <input type="file" class="form-control" onchange="addDrawingFile(this)">
+    <input type="hidden" name="attach_categories" value="圖面" class="cat-input-drawing">
+  `;
+  zone.appendChild(row);
+}
+
+// 動態新增其它附件行
+function addOtherRow(btn) {
+  const zone = document.getElementById('other-zone');
+  const row = document.createElement('div');
+  row.className = 'other-row d-flex gap-2 mb-2 align-items-center';
+  row.innerHTML = `
+    <input type="file" name="attach_files" class="form-control other-file">
+    <input type="hidden" name="attach_categories" value="其它" class="cat-input-other">
+    <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.parentElement.remove()">
+      <i class="bi bi-trash"></i>
+    </button>
+  `;
+  zone.appendChild(row);
+}
+</script>
+{% endblock %}

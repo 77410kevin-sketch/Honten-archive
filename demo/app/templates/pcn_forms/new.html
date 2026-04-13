@@ -1,0 +1,423 @@
+{% extends "base.html" %}
+{% block title %}新建 PCN/ECN{% endblock %}
+{% block content %}
+<div class="container py-3" style="max-width:900px">
+
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="/pcn-forms/">PCN/ECN 管理</a></li>
+      <li class="breadcrumb-item active">新建</li>
+    </ol>
+  </nav>
+
+  <div class="card shadow-sm">
+    <div class="card-header bg-primary text-white">
+      <i class="bi bi-plus-circle me-2"></i>新建 PCN/ECN 變更單
+    </div>
+    <div class="card-body">
+      <form method="post" action="/pcn-forms/new" enctype="multipart/form-data" id="pcnForm">
+
+        {# ── 基本資訊 ── #}
+        <h6 class="fw-bold text-secondary border-bottom pb-1 mb-3">基本資訊</h6>
+        <div class="row g-3 mb-3">
+          <div class="col-md-4">
+            <label class="form-label fw-semibold">類型 <span class="text-danger">*</span></label>
+            <select name="pcn_type" class="form-select" required id="pcnTypeSelect">
+              {% if is_engineer %}
+              <option value="PCN">PCN — 開發轉量產</option>
+              {% endif %}
+              <option value="ECN" {% if not is_engineer %}selected{% endif %}>ECN — 產品工程變更</option>
+            </select>
+            {% if not is_engineer %}
+            <div class="form-text text-info"><i class="bi bi-info-circle me-1"></i>PCN 限工程師建立</div>
+            {% endif %}
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-semibold">提出部門 <span class="text-danger">*</span></label>
+            <select name="department" class="form-select" required>
+              <option value="">— 請選擇 —</option>
+              {% for dept in DEPARTMENTS %}
+              <option value="{{ dept }}">{{ dept }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-semibold">預計生效日期</label>
+            <input type="date" name="effective_date" class="form-control">
+          </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">廠內產品料號 <span class="text-danger">*</span></label>
+            <div id="part-number-zone">
+              <div class="d-flex gap-2 mb-2 align-items-center part-number-row">
+                <input type="text" class="form-control part-number-input" placeholder="輸入料號，例：HT-ESS-5500">
+                <button type="button" class="btn btn-sm btn-outline-danger flex-shrink-0 remove-part-btn"
+                        onclick="removePartRow(this)" style="visibility:hidden">
+                  <i class="bi bi-dash"></i>
+                </button>
+              </div>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-primary mt-1" onclick="addPartRow()" id="addPartBtn">
+              <i class="bi bi-plus-circle me-1"></i>新增料號
+            </button>
+            <div class="form-text text-muted">最多 10 筆，每筆一個料號</div>
+            <input type="hidden" name="product_name" id="productNameHidden">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">機種名稱</label>
+            <input type="text" name="product_model" class="form-control"
+              placeholder="例：HT-ESS-5500">
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">變更說明 <span class="text-danger">*</span></label>
+          <textarea name="change_description" class="form-control" rows="4"
+            placeholder="詳細說明本次 PCN/ECN 的變更內容..." required></textarea>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">變更原因</label>
+          <textarea name="change_reason" class="form-control" rows="2"
+            placeholder="為什麼需要此次變更？"></textarea>
+        </div>
+
+        {# ── ECN 變更類型（僅 ECN 顯示）── #}
+        <div id="ecnChangeTypesSection" class="mb-4 p-3 border rounded"
+             style="display:none; background:#fffef5; border-color:#ffc107!important">
+          <label class="form-label fw-semibold">
+            <i class="bi bi-tags me-1 text-warning"></i>ECN 變更類型
+            <span class="text-muted fw-normal small">（可多選，決定審核流程）</span>
+          </label>
+
+          <div class="mb-3">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <span class="badge bg-info text-dark">技術類</span>
+              <small class="text-muted">需工程確認意見 → 品保確認意見 → BU Head 審核</small>
+            </div>
+            <div class="d-flex flex-wrap gap-4">
+              {% for ct in ['製程變更', '設計變更', '供應商變更'] %}
+              <div class="form-check">
+                <input class="form-check-input change-type-check" type="checkbox"
+                       value="{{ ct }}" id="ct_{{ ct }}" onchange="updateChangeTypes()">
+                <label class="form-check-label fw-semibold" for="ct_{{ ct }}">{{ ct }}</label>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div>
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <span class="badge bg-warning text-dark">商業類</span>
+              <small class="text-muted">直接送 BU Head 審核（無需工程與品保確認）</small>
+            </div>
+            <div class="d-flex flex-wrap gap-4">
+              {% for ct in ['售價變更', '成本變更'] %}
+              <div class="form-check">
+                <input class="form-check-input change-type-check" type="checkbox"
+                       value="{{ ct }}" id="ct_{{ ct }}" onchange="updateChangeTypes()">
+                <label class="form-check-label fw-semibold" for="ct_{{ ct }}">{{ ct }}</label>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div id="ecnFlowHint" class="mt-3 alert alert-secondary py-2 small mb-0" style="display:none"></div>
+          <input type="hidden" name="change_types" id="changeTypesHidden" value="[]">
+        </div>
+
+        {# ── 附件上傳 ── #}
+        <h6 class="fw-bold text-secondary border-bottom pb-1 mb-3">
+          附件上傳
+          <span class="text-muted fw-normal small">（送審前需至少一個附件）</span>
+        </h6>
+
+        {# 圖面/報價單 #}
+        <div class="mb-3 p-3 border rounded bg-light">
+          <label class="form-label fw-semibold">
+            <i class="bi bi-file-earmark-image me-1 text-primary"></i>圖面／報價單
+            <span class="badge bg-primary-subtle text-primary border border-primary-subtle ms-1"
+                  style="font-size:0.7rem">
+              <i class="bi bi-clipboard-image me-1"></i>支援截圖貼上
+            </span>
+          </label>
+          <div id="draw-paste-zone" tabindex="0"
+               class="border border-2 rounded p-3 text-center mb-2 draw-zone-idle"
+               style="cursor:pointer;min-height:72px;outline:none;transition:all .2s"
+               onclick="this.focus()">
+            <i class="bi bi-clipboard-image fs-3 text-primary d-block mb-1"></i>
+            <div class="text-muted small">
+              點此區域，然後按 <kbd>Ctrl+V</kbd> 貼上截圖<br>
+              <span class="text-secondary" style="font-size:0.75rem">（可貼上多張）</span>
+            </div>
+            <div id="draw-preview" class="mt-2 d-flex flex-wrap gap-2 justify-content-center"></div>
+          </div>
+          <div id="drawing-zone"></div>
+          <button type="button" class="btn btn-sm btn-outline-primary mt-1"
+                  onclick="addFileRow('drawing-zone','圖面/報價單')">
+            <i class="bi bi-folder2-open me-1"></i>或選擇檔案上傳
+          </button>
+          <div class="form-text">支援 PDF、DWG、PNG、JPG、Excel 等</div>
+        </div>
+
+        {# 料號BOM途程（截圖貼上）#}
+        <div class="mb-3 p-3 border rounded bg-light">
+          <label class="form-label fw-semibold">
+            <i class="bi bi-grid-3x3 me-1 text-warning"></i>料號 BOM 途程
+            <span class="badge bg-warning-subtle text-warning border border-warning-subtle ms-1"
+                  style="font-size:0.7rem">
+              <i class="bi bi-clipboard-image me-1"></i>支援截圖貼上
+            </span>
+          </label>
+
+          {# 貼上區 #}
+          <div id="bom-paste-zone" tabindex="0"
+               class="border border-2 rounded p-3 text-center mb-2 bom-zone-idle"
+               style="cursor:pointer;min-height:80px;outline:none;transition:all .2s"
+               onclick="this.focus()">
+            <i class="bi bi-clipboard-image fs-3 text-warning d-block mb-1"></i>
+            <div class="text-muted small">
+              點此區域，然後按 <kbd>Ctrl+V</kbd> 貼上截圖<br>
+              <span class="text-secondary" style="font-size:0.75rem">（可貼上多張）</span>
+            </div>
+            <div id="bom-preview" class="mt-2 d-flex flex-wrap gap-2 justify-content-center"></div>
+          </div>
+
+          {# 或選擇檔案 #}
+          <div id="bom-zone"></div>
+          <button type="button" class="btn btn-sm btn-outline-warning mt-1"
+                  onclick="addFileRow('bom-zone','料號BOM途程')">
+            <i class="bi bi-folder2-open me-1"></i>或選擇檔案上傳
+          </button>
+        </div>
+
+        {# 其它附件 #}
+        <div class="mb-4 p-3 border rounded bg-light">
+          <label class="form-label fw-semibold">
+            <i class="bi bi-paperclip me-1 text-secondary"></i>其它附件（選填）
+          </label>
+          <div id="other-zone"></div>
+          <button type="button" class="btn btn-sm btn-outline-secondary mt-1"
+                  onclick="addFileRow('other-zone','其它')">
+            <i class="bi bi-plus-circle me-1"></i>新增
+          </button>
+        </div>
+
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-primary" id="submitBtn">
+            <i class="bi bi-floppy me-1"></i>儲存草稿
+          </button>
+          <a href="/pcn-forms/" class="btn btn-outline-secondary">取消</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<style>
+.bom-zone-idle   { border-color: #ffc107 !important; background: #fffdf0; }
+.bom-zone-focus  { border-color: #fd7e14 !important; background: #fff8ec; box-shadow: 0 0 0 3px rgba(253,126,20,.15); }
+.draw-zone-idle  { border-color: #0d6efd !important; background: #f0f4ff; }
+.draw-zone-focus { border-color: #0b5ed7 !important; background: #e8eeff; box-shadow: 0 0 0 3px rgba(13,110,253,.15); }
+</style>
+
+<script>
+// ── ECN 類型切換 ────────────────────────────────
+const typeSelect = document.getElementById('pcnTypeSelect');
+const ecnSection = document.getElementById('ecnChangeTypesSection');
+function toggleEcnSection() {
+  ecnSection.style.display = typeSelect.value === 'ECN' ? 'block' : 'none';
+}
+typeSelect.addEventListener('change', toggleEcnSection);
+toggleEcnSection();
+
+const TECH_TYPES = new Set(['製程變更', '設計變更', '供應商變更']);
+function updateChangeTypes() {
+  const checked = [...document.querySelectorAll('.change-type-check:checked')].map(cb => cb.value);
+  document.getElementById('changeTypesHidden').value = JSON.stringify(checked);
+  const hint = document.getElementById('ecnFlowHint');
+  const hasTech = checked.some(v => TECH_TYPES.has(v));
+  if (checked.length === 0) {
+    hint.style.display = 'none';
+  } else {
+    hint.style.display = 'block';
+    if (hasTech) {
+      hint.className = 'mt-3 alert alert-info py-2 small mb-0';
+      hint.innerHTML = '<i class="bi bi-info-circle me-1"></i>包含技術類變更 → 流程：<strong>工程確認 → 品保確認 → BU Head 審核</strong>';
+    } else {
+      hint.className = 'mt-3 alert alert-warning py-2 small mb-0';
+      hint.innerHTML = '<i class="bi bi-lightning-charge me-1"></i>純商業類變更 → 流程：<strong>直接送 BU Head 審核</strong>';
+    }
+  }
+}
+
+// ── 廠內產品料號動態列 ──────────────────────────
+const MAX_PARTS = 10;
+function addPartRow() {
+  const zone = document.getElementById('part-number-zone');
+  const rows = zone.querySelectorAll('.part-number-row');
+  if (rows.length >= MAX_PARTS) return;
+  const row = document.createElement('div');
+  row.className = 'd-flex gap-2 mb-2 align-items-center part-number-row';
+  row.innerHTML = `
+    <input type="text" class="form-control part-number-input" placeholder="輸入料號">
+    <button type="button" class="btn btn-sm btn-outline-danger flex-shrink-0 remove-part-btn"
+            onclick="removePartRow(this)">
+      <i class="bi bi-dash"></i>
+    </button>`;
+  zone.appendChild(row);
+  if (zone.querySelectorAll('.part-number-row').length >= MAX_PARTS) {
+    document.getElementById('addPartBtn').style.display = 'none';
+  }
+  updateRemoveButtons();
+}
+function removePartRow(btn) {
+  btn.closest('.part-number-row').remove();
+  document.getElementById('addPartBtn').style.display = '';
+  updateRemoveButtons();
+}
+function updateRemoveButtons() {
+  const rows = document.querySelectorAll('#part-number-zone .part-number-row');
+  rows.forEach(row => {
+    const btn = row.querySelector('.remove-part-btn');
+    if (btn) btn.style.visibility = rows.length > 1 ? 'visible' : 'hidden';
+  });
+}
+
+// ── 動態新增檔案列 ──────────────────────────────
+function addFileRow(zoneId, category) {
+  const zone = document.getElementById(zoneId);
+  const row  = document.createElement('div');
+  row.className = 'd-flex gap-2 mb-2 align-items-center';
+  row.innerHTML = `
+    <input type="file" name="attach_files" class="form-control">
+    <input type="hidden" name="attach_categories" value="${category}">
+    <button type="button" class="btn btn-sm btn-outline-danger flex-shrink-0"
+            onclick="this.parentElement.remove()">
+      <i class="bi bi-trash"></i>
+    </button>`;
+  zone.appendChild(row);
+}
+
+// ── 截圖貼上（圖面/報價單）────────────────────
+let drawingPastedFiles = [];
+const drawPasteZone = document.getElementById('draw-paste-zone');
+drawPasteZone.addEventListener('focus', function() {
+  this.classList.replace('draw-zone-idle','draw-zone-focus');
+});
+drawPasteZone.addEventListener('blur', function() {
+  this.classList.replace('draw-zone-focus','draw-zone-idle');
+});
+drawPasteZone.addEventListener('paste', e => handlePaste(e, 'draw'));
+
+// ── 截圖貼上（BOM途程）────────────────────────
+let bomPastedFiles = [];
+const bomPasteZone = document.getElementById('bom-paste-zone');
+bomPasteZone.addEventListener('focus', function() {
+  this.classList.replace('bom-zone-idle','bom-zone-focus');
+});
+bomPasteZone.addEventListener('blur', function() {
+  this.classList.replace('bom-zone-focus','bom-zone-idle');
+});
+bomPasteZone.addEventListener('paste', e => handlePaste(e, 'bom'));
+
+// 全域監聽（非輸入欄位時，貼到 BOM 區）
+document.addEventListener('paste', function(e) {
+  const tag = document.activeElement.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  if (document.activeElement === drawPasteZone) return; // 已由上面處理
+  handlePaste(e, 'bom');
+});
+
+function handlePaste(e, target) {
+  const items = e.clipboardData && e.clipboardData.items;
+  if (!items) return;
+  let found = false;
+  for (let i = 0; i < items.length; i++) {
+    if (items[i].type.startsWith('image/')) {
+      const file = items[i].getAsFile();
+      if (!file) continue;
+      found = true;
+      if (target === 'draw') {
+        const idx = drawingPastedFiles.length;
+        drawingPastedFiles.push(file);
+        renderPreview(file, idx, 'draw-preview', '#0d6efd', '圖面截圖', drawingPastedFiles);
+      } else {
+        const idx = bomPastedFiles.length;
+        bomPastedFiles.push(file);
+        renderPreview(file, idx, 'bom-preview', '#ffc107', 'BOM截圖', bomPastedFiles);
+      }
+    }
+  }
+  if (found) {
+    e.preventDefault();
+    (target === 'draw' ? drawPasteZone : bomPasteZone).focus();
+  }
+}
+
+function renderPreview(file, idx, previewId, borderColor, label, fileArr) {
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    const preview = document.getElementById(previewId);
+    const wrap = document.createElement('div');
+    wrap.className = 'position-relative d-inline-block text-start';
+    wrap.dataset.idx = idx;
+    wrap.innerHTML = `
+      <img src="${ev.target.result}"
+           style="height:96px;border-radius:6px;border:2px solid ${borderColor};object-fit:cover;display:block"
+           title="${label} ${idx+1}">
+      <button type="button"
+              onclick="fileArr[${idx}]=null; this.closest('[data-idx]').remove()"
+              class="btn btn-danger btn-sm position-absolute top-0 end-0 p-0"
+              style="width:20px;height:20px;font-size:12px;line-height:1;border-radius:50%">×</button>
+      <div class="text-muted text-center" style="font-size:0.68rem">${label}${idx+1}</div>`;
+    preview.appendChild(wrap);
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── 送出攔截：收集料號 + 貼上圖片 ─────────────
+document.getElementById('pcnForm').addEventListener('submit', function(e) {
+  // 收集廠內產品料號
+  const partInputs = document.querySelectorAll('#part-number-zone .part-number-input');
+  const partValues = [...partInputs].map(i => i.value.trim()).filter(Boolean);
+  if (partValues.length === 0) {
+    alert('請輸入至少一筆廠內產品料號');
+    e.preventDefault();
+    return;
+  }
+  document.getElementById('productNameHidden').value = partValues.join('\n');
+
+  updateChangeTypes();
+
+  const validDraw = drawingPastedFiles.filter(Boolean);
+  const validBom  = bomPastedFiles.filter(Boolean);
+  if (validDraw.length === 0 && validBom.length === 0) return;
+
+  e.preventDefault();
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>上傳中...';
+
+  const formData = new FormData(this);
+  validDraw.forEach((file, i) => {
+    formData.append('attach_files',      file, `圖面截圖_${i+1}.png`);
+    formData.append('attach_categories', '圖面/報價單');
+  });
+  validBom.forEach((file, i) => {
+    formData.append('attach_files',      file, `BOM途程截圖_${i+1}.png`);
+    formData.append('attach_categories', '料號BOM途程');
+  });
+
+  fetch(this.action, { method: 'POST', body: formData })
+    .then(res => { window.location.href = res.url; })
+    .catch(() => {
+      alert('上傳失敗，請重試');
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-floppy me-1"></i>儲存草稿';
+    });
+});
+</script>
+{% endblock %}

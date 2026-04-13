@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% block title %}編輯 {{ form.form_id }}{% endblock %}
+{% block content %}
+<div class="container py-3" style="max-width:860px">
+
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="/pcn-forms/">PCN/ECN 管理</a></li>
+      <li class="breadcrumb-item"><a href="/pcn-forms/{{ form.form_id }}">{{ form.form_id }}</a></li>
+      <li class="breadcrumb-item active">編輯</li>
+    </ol>
+  </nav>
+
+  {% if form.status.value == 'RETURNED' %}
+  <div class="alert alert-warning d-flex align-items-center mb-3">
+    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+    <div>此單已被退回，請修改後重新送審。</div>
+  </div>
+  {% endif %}
+
+  <div class="card shadow-sm">
+    <div class="card-header bg-warning text-dark">
+      <i class="bi bi-pencil-square me-2"></i>編輯 {{ form.form_id }}
+    </div>
+    <div class="card-body">
+      <form method="post" action="/pcn-forms/{{ form.form_id }}/edit" enctype="multipart/form-data">
+
+        {# ── 基本資訊 ── #}
+        <h6 class="fw-bold text-secondary border-bottom pb-1 mb-3">基本資訊</h6>
+        <div class="row g-3 mb-3">
+          <div class="col-md-4">
+            <label class="form-label fw-semibold">類型</label>
+            <input type="text" class="form-control" value="{{ form.type.value }} — {% if form.type.value == 'PCN' %}開發轉量產{% else %}產品工程變更{% endif %}" disabled>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-semibold">事業部 <span class="text-danger">*</span></label>
+            <select name="bu" class="form-select" required>
+              {% for b in BU %}
+              <option value="{{ b.value }}" {% if form.bu == b.value %}selected{% endif %}>{{ b.value }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label fw-semibold">預計生效日期</label>
+            <input type="date" name="effective_date" class="form-control"
+              value="{{ form.effective_date or '' }}">
+          </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">產品名稱 <span class="text-danger">*</span></label>
+            <input type="text" name="product_name" class="form-control"
+              value="{{ form.product_name }}" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">產品型號</label>
+            <input type="text" name="product_model" class="form-control"
+              value="{{ form.product_model or '' }}">
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">變更說明 <span class="text-danger">*</span></label>
+          <textarea name="change_description" class="form-control" rows="4" required>{{ form.change_description }}</textarea>
+        </div>
+
+        <div class="mb-4">
+          <label class="form-label fw-semibold">變更原因</label>
+          <textarea name="change_reason" class="form-control" rows="2">{{ form.change_reason or '' }}</textarea>
+        </div>
+
+        {# ── 指派人員 ── #}
+        <h6 class="fw-bold text-secondary border-bottom pb-1 mb-3">指派人員</h6>
+        <div class="row g-3 mb-4">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">指定品保人員</label>
+            <select name="assigned_qc_id" class="form-select">
+              <option value="">— 由品保自行認領 —</option>
+              {% for u in qc_users %}
+              <option value="{{ u.id }}" {% if form.assigned_qc_id == u.id %}selected{% endif %}>
+                {{ u.display_name }} ({{ u.username }})
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">指定產線主管</label>
+            <select name="assigned_prod_mgr_id" class="form-select">
+              <option value="">— 由產線主管自行認領 —</option>
+              {% for u in pm_users %}
+              <option value="{{ u.id }}" {% if form.assigned_prod_mgr_id == u.id %}selected{% endif %}>
+                {{ u.display_name }} ({{ u.username }})
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        {# ── 已上傳附件 ── #}
+        {% if form.documents %}
+        <h6 class="fw-bold text-secondary border-bottom pb-1 mb-3">已上傳附件</h6>
+
+        {% set categories_order = ['圖面', 'SIP檢表', '作業SOP', '包裝SOP', '其它'] %}
+        {% for cat in categories_order %}
+          {% if cat in docs_by_cat %}
+          <div class="mb-3">
+            <div class="fw-semibold small text-muted mb-1">
+              <i class="bi bi-folder2-open me-1"></i>{{ cat }}
+            </div>
+            {% for doc in docs_by_cat[cat] %}
+            <div class="d-flex justify-content-between align-items-center border rounded px-3 py-2 mb-1 bg-light">
+              <div>
+                <i class="bi bi-file-earmark me-1 text-secondary"></i>
+                <a href="/pcn-forms/doc/preview/{{ doc.id }}" target="_blank" class="text-decoration-none">
+                  {{ doc.original_name }}
+                </a>
+                <small class="text-muted ms-2">{{ doc.uploaded_at.strftime('%m/%d %H:%M') }}</small>
+              </div>
+              <form method="post" action="/pcn-forms/{{ form.form_id }}/delete-doc/{{ doc.id }}"
+                    onsubmit="return confirm('確定刪除此附件？')">
+                <button type="submit" class="btn btn-sm btn-outline-danger">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            </div>
+            {% endfor %}
+          </div>
+          {% endif %}
+        {% endfor %}
+        {% endif %}
+
+        {# ── 補充上傳附件 ── #}
+        <h6 class="fw-bold text-secondary border-bottom pb-1 mb-3">補充上傳附件</h6>
+
+        {# 圖面補充 #}
+        <div class="mb-3 p-3 border rounded bg-light">
+          <label class="form-label fw-semibold"><i class="bi bi-file-earmark-image me-1 text-primary"></i>補充圖面</label>
+          <div id="drawing-zone">
+            <div class="d-flex gap-2 mb-2">
+              <input type="file" name="attach_files" class="form-control" onchange="addDrawingFile(this)">
+              <input type="hidden" name="attach_categories" value="圖面">
+            </div>
+          </div>
+        </div>
+
+        {# 其它附件 #}
+        <div class="mb-4 p-3 border rounded bg-light">
+          <label class="form-label fw-semibold"><i class="bi bi-paperclip me-1 text-secondary"></i>其它附件</label>
+          <div id="other-zone">
+            <div class="d-flex gap-2 mb-2">
+              <input type="file" name="attach_files" class="form-control">
+              <input type="hidden" name="attach_categories" value="其它">
+              <button type="button" class="btn btn-sm btn-outline-secondary" onclick="addOtherRow()">
+                <i class="bi bi-plus"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-warning text-dark">
+            <i class="bi bi-floppy me-1"></i>儲存變更
+          </button>
+          <a href="/pcn-forms/{{ form.form_id }}" class="btn btn-outline-secondary">取消</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function addDrawingFile(input) {
+  if (!input.files[0]) return;
+  const zone = document.getElementById('drawing-zone');
+  const row = document.createElement('div');
+  row.className = 'd-flex gap-2 mb-2';
+  row.innerHTML = `
+    <input type="file" name="attach_files" class="form-control" onchange="addDrawingFile(this)">
+    <input type="hidden" name="attach_categories" value="圖面">
+  `;
+  zone.appendChild(row);
+}
+function addOtherRow() {
+  const zone = document.getElementById('other-zone');
+  const row = document.createElement('div');
+  row.className = 'd-flex gap-2 mb-2';
+  row.innerHTML = `
+    <input type="file" name="attach_files" class="form-control">
+    <input type="hidden" name="attach_categories" value="其它">
+    <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.parentElement.remove()">
+      <i class="bi bi-trash"></i>
+    </button>
+  `;
+  zone.appendChild(row);
+}
+</script>
+{% endblock %}

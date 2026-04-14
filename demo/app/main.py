@@ -23,7 +23,7 @@ async def seed_users():
         {"username": "prodmgr01",  "display_name": "張產線主管",  "role": Role.PROD_MGR,  "bu": None},
         {"username": "buhead",     "display_name": "陳BU主管",    "role": Role.BU,        "bu": BU.ENERGY},
         {"username": "engmgr",     "display_name": "林工程主管",  "role": Role.ENG_MGR,   "bu": None},
-        {"username": "pc01",       "display_name": "黃採購",      "role": Role.PURCHASE,  "bu": None},
+        {"username": "purchase01", "display_name": "黃採購",      "role": Role.PURCHASE,  "bu": None},
         {"username": "asst01",     "display_name": "周業助",      "role": Role.ASSISTANT, "bu": None},
         {"username": "sales01",    "display_name": "吳業務",      "role": Role.SALES,     "bu": BU.ENERGY},
         {"username": "hr01",       "display_name": "鄭人事",      "role": Role.HR,        "bu": None},
@@ -49,8 +49,7 @@ async def run_migrations():
     migrations = [
         # PCNApproval 退回對象欄位
         "ALTER TABLE pcn_approvals ADD COLUMN reject_target VARCHAR(50)",
-        # 採購帳號改名 purchase01 → pc01
-        "UPDATE users SET username='pc01' WHERE username='purchase01'",
+        # User 新角色相關（Role Enum 不需遷移，只需確保欄位存在）
     ]
     async with engine.begin() as conn:
         for sql in migrations:

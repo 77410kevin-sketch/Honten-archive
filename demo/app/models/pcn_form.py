@@ -39,6 +39,7 @@ class PCNForm(Base):
     change_reason        = Column(Text, nullable=True)
     effective_date       = Column(String(20), nullable=True)
     change_types         = Column(Text, nullable=True)   # JSON 陣列，ECN 變更類型
+    inventory_data       = Column(Text, nullable=True)   # JSON，ECN 設計變更庫存盤點
     created_by           = Column(Integer, ForeignKey("users.id"), nullable=False)
     assigned_qc_id       = Column(Integer, ForeignKey("users.id"), nullable=True)
     assigned_prod_mgr_id = Column(Integer, ForeignKey("users.id"), nullable=True)

@@ -33,17 +33,14 @@
             {% endif %}
           </div>
           <div class="col-md-4">
-            <label class="form-label fw-semibold">提出部門 <span class="text-danger">*</span></label>
-            <select name="department" class="form-select" required>
-              <option value="">— 請選擇 —</option>
-              {% for dept in DEPARTMENTS %}
-              <option value="{{ dept }}">{{ dept }}</option>
-              {% endfor %}
-            </select>
+            <label class="form-label fw-semibold">提出人 <span class="text-danger">*</span></label>
+            <input type="text" name="department" class="form-control"
+                   placeholder="填寫提出人姓名" required>
           </div>
           <div class="col-md-4">
-            <label class="form-label fw-semibold">預計生效日期</label>
-            <input type="date" name="effective_date" class="form-control">
+            <label class="form-label fw-semibold">提案日期</label>
+            <input type="date" name="effective_date" class="form-control"
+                   value="{{ today }}">
           </div>
         </div>
 
@@ -73,15 +70,20 @@
         </div>
 
         <div class="mb-3">
-          <label class="form-label fw-semibold">變更說明 <span class="text-danger">*</span></label>
+          <label class="form-label fw-semibold" id="labelDesc">
+            <span id="descLabelText">變更說明</span> <span class="text-danger">*</span>
+          </label>
           <textarea name="change_description" class="form-control" rows="4"
-            placeholder="詳細說明本次 PCN/ECN 的變更內容..." required></textarea>
+            id="descTextarea" placeholder="詳細說明本次 PCN/ECN 的變更內容..." required></textarea>
         </div>
 
-        <div class="mb-3">
-          <label class="form-label fw-semibold">變更原因</label>
+        {# 變更原因：PCN 顯示（各製程包裝說明），ECN 隱藏 #}
+        <div class="mb-3" id="changeReasonSection">
+          <label class="form-label fw-semibold" id="labelReason">
+            <span id="reasonLabelText">變更原因</span>
+          </label>
           <textarea name="change_reason" class="form-control" rows="2"
-            placeholder="為什麼需要此次變更？"></textarea>
+            id="reasonTextarea" placeholder=""></textarea>
         </div>
 
         {# ── ECN 變更類型（僅 ECN 顯示）── #}
@@ -128,16 +130,78 @@
           <input type="hidden" name="change_types" id="changeTypesHidden" value="[]">
         </div>
 
+        {# ── ECN 設計變更：庫存盤點 ── #}
+        <div id="inventorySection" class="mb-4 p-3 border rounded"
+             style="display:none; background:#f0fff4; border-color:#198754!important">
+          <div class="d-flex align-items-center gap-2 mb-3">
+            <i class="bi bi-boxes text-success fs-5"></i>
+            <span class="fw-bold">庫存盤點作業</span>
+            <span class="badge bg-success-subtle text-success border border-success-subtle">設計變更專用</span>
+            <small class="text-muted">— 區分新舊料，由工程與品保判定各站數量與處理方式</small>
+          </div>
+
+          {# 填寫說明 #}
+          <div class="d-flex flex-wrap gap-2 mb-2 small">
+            <span><span class="badge bg-success-subtle text-success border border-success-subtle">提出人填寫</span> 站別、舊料號</span>
+            <span><span class="badge bg-primary-subtle text-primary border border-primary-subtle">倉庫填寫</span> 舊料庫存量</span>
+            <span><span class="badge bg-warning-subtle text-warning border border-warning-subtle">工程填寫</span> 處理方式、備註</span>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table table-bordered table-sm align-middle mb-2" id="inventoryTable">
+              <thead>
+                <tr>
+                  <th style="width:36px" class="text-center bg-light">#</th>
+                  <th style="background:#d1e7dd">站別／工序<br><small class="fw-normal text-success">提出人</small></th>
+                  <th style="background:#d1e7dd">舊料號<br><small class="fw-normal text-success">提出人</small></th>
+                  <th style="background:#cfe2ff">舊料庫存量<br><small class="fw-normal text-primary">倉庫</small></th>
+                  <th style="background:#fff3cd">處理方式<br><small class="fw-normal text-warning">工程</small></th>
+                  <th style="background:#fff3cd">備註<br><small class="fw-normal text-warning">工程</small></th>
+                  <th style="width:36px" class="bg-light"></th>
+                </tr>
+              </thead>
+              <tbody id="inventoryBody">
+                <tr>
+                  <td class="text-center text-muted row-num bg-light">1</td>
+                  <td style="background:#f0fff4"><input type="text" class="form-control form-control-sm border-0 bg-transparent inv-station" placeholder="例：SMT／組裝站"></td>
+                  <td style="background:#f0fff4"><input type="text" class="form-control form-control-sm border-0 bg-transparent inv-old-pn" placeholder="舊料號"></td>
+                  <td style="background:#f0f8ff"><input type="number" class="form-control form-control-sm border-0 bg-transparent inv-qty" placeholder="0" min="0"></td>
+                  <td style="background:#fffdf0">
+                    <select class="form-select form-select-sm border-0 bg-transparent inv-action">
+                      <option value="">— 待工程品保判定 —</option>
+                      <option value="使用完畢">使用完畢（繼續消耗）</option>
+                      <option value="報廢">報廢處理</option>
+                      <option value="退供應商">退回供應商</option>
+                      <option value="轉移使用">轉移至其他專案</option>
+                    </select>
+                  </td>
+                  <td style="background:#fffdf0"><input type="text" class="form-control form-control-sm border-0 bg-transparent inv-remark" placeholder="補充說明..."></td>
+                  <td class="text-center bg-light">
+                    <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1"
+                            onclick="removeInvRow(this)" style="visibility:hidden">
+                      <i class="bi bi-dash"></i>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-success" onclick="addInvRow()">
+            <i class="bi bi-plus-circle me-1"></i>新增站別
+          </button>
+          <input type="hidden" name="inventory_data" id="inventoryDataHidden">
+        </div>
+
         {# ── 附件上傳 ── #}
         <h6 class="fw-bold text-secondary border-bottom pb-1 mb-3">
           附件上傳
           <span class="text-muted fw-normal small">（送審前需至少一個附件）</span>
         </h6>
 
-        {# 圖面/報價單 #}
+        {# 圖面（PCN）/ 圖面·報價單（ECN）#}
         <div class="mb-3 p-3 border rounded bg-light">
           <label class="form-label fw-semibold">
-            <i class="bi bi-file-earmark-image me-1 text-primary"></i>圖面／報價單
+            <i class="bi bi-file-earmark-image me-1 text-primary"></i><span id="drawingLabel">圖面</span>
             <span class="badge bg-primary-subtle text-primary border border-primary-subtle ms-1"
                   style="font-size:0.7rem">
               <i class="bi bi-clipboard-image me-1"></i>支援截圖貼上
@@ -224,16 +288,44 @@
 </style>
 
 <script>
-// ── ECN 類型切換 ────────────────────────────────
+// ── PCN/ECN 動態欄位切換 ────────────────────────
 const typeSelect = document.getElementById('pcnTypeSelect');
 const ecnSection = document.getElementById('ecnChangeTypesSection');
-function toggleEcnSection() {
-  ecnSection.style.display = typeSelect.value === 'ECN' ? 'block' : 'none';
-}
-typeSelect.addEventListener('change', toggleEcnSection);
-toggleEcnSection();
+const changeReasonSection = document.getElementById('changeReasonSection');
 
+function onTypeChange() {
+  const isPCN = typeSelect.value === 'PCN';
+
+  // ECN 變更類型區塊
+  ecnSection.style.display = isPCN ? 'none' : 'block';
+
+  // 變更說明標籤
+  document.getElementById('descLabelText').textContent =
+    isPCN ? '製程說明與參數定義' : '變更說明';
+  document.getElementById('descTextarea').placeholder =
+    isPCN ? '說明製程步驟、參數設定與規格定義...' : '詳細說明本次 ECN 的變更內容...';
+
+  // 變更原因：PCN 顯示（各製程包裝說明），ECN 隱藏
+  changeReasonSection.style.display = isPCN ? 'block' : 'none';
+  if (isPCN) {
+    document.getElementById('reasonLabelText').textContent = '各製程包裝說明';
+    document.getElementById('reasonTextarea').placeholder = '說明各製程對應的包裝規格與注意事項...';
+  }
+
+  // 圖面標籤
+  document.getElementById('drawingLabel').textContent = isPCN ? '圖面' : '圖面／報價單';
+
+  // ECN 切換時重設庫存盤點
+  if (isPCN) document.getElementById('inventorySection').style.display = 'none';
+  else updateInventorySection();
+}
+
+typeSelect.addEventListener('change', onTypeChange);
+onTypeChange();
+
+// ── ECN 變更類型 + 庫存盤點聯動 ────────────────
 const TECH_TYPES = new Set(['製程變更', '設計變更', '供應商變更']);
+
 function updateChangeTypes() {
   const checked = [...document.querySelectorAll('.change-type-check:checked')].map(cb => cb.value);
   document.getElementById('changeTypesHidden').value = JSON.stringify(checked);
@@ -251,6 +343,71 @@ function updateChangeTypes() {
       hint.innerHTML = '<i class="bi bi-lightning-charge me-1"></i>純商業類變更 → 流程：<strong>直接送 BU Head 審核</strong>';
     }
   }
+  updateInventorySection();
+}
+
+function updateInventorySection() {
+  const isDesignChange = document.getElementById('ct_設計變更')?.checked;
+  const isECN = typeSelect.value === 'ECN';
+  document.getElementById('inventorySection').style.display =
+    (isECN && isDesignChange) ? 'block' : 'none';
+}
+
+// ── 庫存盤點表格 ───────────────────────────────
+function addInvRow() {
+  const tbody = document.getElementById('inventoryBody');
+  const rowCount = tbody.querySelectorAll('tr').length + 1;
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td class="text-center text-muted row-num bg-light">${rowCount}</td>
+    <td style="background:#f0fff4"><input type="text" class="form-control form-control-sm border-0 bg-transparent inv-station" placeholder="例：SMT／組裝站"></td>
+    <td style="background:#f0fff4"><input type="text" class="form-control form-control-sm border-0 bg-transparent inv-old-pn" placeholder="舊料號"></td>
+    <td style="background:#f0f8ff"><input type="number" class="form-control form-control-sm border-0 bg-transparent inv-qty" placeholder="0" min="0"></td>
+    <td style="background:#fffdf0">
+      <select class="form-select form-select-sm border-0 bg-transparent inv-action">
+        <option value="">— 待工程品保判定 —</option>
+        <option value="使用完畢">使用完畢（繼續消耗）</option>
+        <option value="報廢">報廢處理</option>
+        <option value="退供應商">退回供應商</option>
+        <option value="轉移使用">轉移至其他專案</option>
+      </select>
+    </td>
+    <td style="background:#fffdf0"><input type="text" class="form-control form-control-sm border-0 bg-transparent inv-remark" placeholder="補充說明..."></td>
+    <td class="text-center bg-light">
+      <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1"
+              onclick="removeInvRow(this)">
+        <i class="bi bi-dash"></i>
+      </button>
+    </td>`;
+  tbody.appendChild(tr);
+  updateInvRemoveButtons();
+}
+function removeInvRow(btn) {
+  btn.closest('tr').remove();
+  updateInvRemoveButtons();
+  // 重編序號
+  document.querySelectorAll('#inventoryBody .row-num').forEach((el, i) => el.textContent = i + 1);
+}
+function updateInvRemoveButtons() {
+  const rows = document.querySelectorAll('#inventoryBody tr');
+  rows.forEach(row => {
+    const btn = row.querySelector('button');
+    if (btn) btn.style.visibility = rows.length > 1 ? 'visible' : 'hidden';
+  });
+}
+function collectInventoryData() {
+  const rows = document.querySelectorAll('#inventoryBody tr');
+  const data = [];
+  rows.forEach(row => {
+    data.push({
+      station: row.querySelector('.inv-station')?.value.trim() || '',
+      old_pn:  row.querySelector('.inv-old-pn')?.value.trim() || '',
+      qty:     row.querySelector('.inv-qty')?.value.trim() || '',
+      action:  row.querySelector('.inv-action')?.value || '',
+      remark:  row.querySelector('.inv-remark')?.value.trim() || '',
+    });
+  });
+  return data;
 }
 
 // ── 廠內產品料號動態列 ──────────────────────────
@@ -378,7 +535,7 @@ function renderPreview(file, idx, previewId, borderColor, label, fileArr) {
   reader.readAsDataURL(file);
 }
 
-// ── 送出攔截：收集料號 + 貼上圖片 ─────────────
+// ── 送出攔截：收集料號 + 庫存盤點 + 貼上圖片 ──
 document.getElementById('pcnForm').addEventListener('submit', function(e) {
   // 收集廠內產品料號
   const partInputs = document.querySelectorAll('#part-number-zone .part-number-input');
@@ -391,6 +548,13 @@ document.getElementById('pcnForm').addEventListener('submit', function(e) {
   document.getElementById('productNameHidden').value = partValues.join('\n');
 
   updateChangeTypes();
+
+  // 收集庫存盤點資料
+  const invSection = document.getElementById('inventorySection');
+  if (invSection.style.display !== 'none') {
+    document.getElementById('inventoryDataHidden').value =
+      JSON.stringify(collectInventoryData());
+  }
 
   const validDraw = drawingPastedFiles.filter(Boolean);
   const validBom  = bomPastedFiles.filter(Boolean);

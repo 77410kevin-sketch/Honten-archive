@@ -49,7 +49,8 @@ async def run_migrations():
     migrations = [
         # PCNApproval 退回對象欄位
         "ALTER TABLE pcn_approvals ADD COLUMN reject_target VARCHAR(50)",
-        # User 新角色相關（Role Enum 不需遷移，只需確保欄位存在）
+        # ECN 設計變更庫存盤點
+        "ALTER TABLE pcn_forms ADD COLUMN inventory_data TEXT",
     ]
     async with engine.begin() as conn:
         for sql in migrations:

@@ -144,12 +144,14 @@ async def new_pcn_form_page(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    from datetime import date
     return templates.TemplateResponse("pcn_forms/new.html", {
-        "request":    request,
-        "user":       current_user,
-        "PCNType":    PCNType,
+        "request":     request,
+        "user":        current_user,
+        "PCNType":     PCNType,
         "DEPARTMENTS": DEPARTMENTS,
         "is_engineer": current_user.role in PCN_ALLOWED_ROLES,
+        "today":       date.today().isoformat(),
     })
 
 
@@ -161,13 +163,14 @@ async def create_pcn_form(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     pcn_type:           str = Form(...),
-    department:         str = Form(...),
+    department:         str = Form(...),   # 提出人
     product_name:       str = Form(...),
     product_model:      str = Form(""),
     change_description: str = Form(...),
     change_reason:      str = Form(""),
-    effective_date:     str = Form(""),
-    change_types:       str = Form(""),   # JSON 陣列字串，ECN 用
+    effective_date:     str = Form(""),    # 提案日期
+    change_types:       str = Form(""),    # JSON 陣列字串，ECN 用
+    inventory_data:     str = Form(""),    # JSON，ECN 設計變更庫存盤點
     attach_files:       List[UploadFile] = File(default=[]),
     attach_categories:  List[str] = Form(default=[]),
 ):
@@ -182,9 +185,10 @@ async def create_pcn_form(
         product_name       = product_name,
         product_model      = product_model or None,
         change_description = change_description,
-        change_reason      = change_reason or None,
+        change_reason      = change_reason or None if pcn_type == "PCN" else None,
         effective_date     = effective_date or None,
         change_types       = change_types if pcn_type == "ECN" else None,
+        inventory_data     = inventory_data or None,
         created_by         = current_user.id,
     )
     db.add(form)

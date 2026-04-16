@@ -246,6 +246,10 @@
 .draw-zone-focus { background: #e8f0ff; border-color: #0d6efd !important; box-shadow: 0 0 0 3px rgba(13,110,253,.15); }
 .bom-zone-idle  { background: #fffef0; border-color: #ffc107 !important; }
 .bom-zone-focus { background: #fff8d0; border-color: #e0a800 !important; box-shadow: 0 0 0 3px rgba(255,193,7,.2); }
+@keyframes fadeInDown {
+  from { opacity:0; transform:translateX(-50%) translateY(-12px); }
+  to   { opacity:1; transform:translateX(-50%) translateY(0); }
+}
 </style>
 <script>
 // ── ECN 變更類型 hint ────────────────────────────
@@ -274,7 +278,7 @@ const MAX_PARTS = 10;
 function addPartRow() {
   const zone = document.getElementById('part-number-zone');
   const rows = zone.querySelectorAll('.part-number-row');
-  if (rows.length >= MAX_PARTS) { alert('最多只能新增 ' + MAX_PARTS + ' 筆料號'); return; }
+  if (rows.length >= MAX_PARTS) { showAlert('最多只能新增 ' + MAX_PARTS + ' 筆料號'); return; }
   const row = document.createElement('div');
   row.className = 'd-flex gap-2 mb-2 align-items-center part-number-row';
   row.innerHTML = `
@@ -301,6 +305,16 @@ function updateRemoveButtons() {
   });
 }
 
+// ── showAlert 浮動提示 ───────────────────────────
+function showAlert(msg) {
+  const el = document.createElement('div');
+  el.className = 'alert alert-danger shadow-sm d-flex align-items-center gap-2';
+  el.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9999;min-width:320px;max-width:540px;border-radius:10px;font-size:.95rem;animation:fadeInDown .3s';
+  el.innerHTML = `<i class="bi bi-exclamation-triangle-fill text-danger fs-5"></i><span>${msg}</span>`;
+  document.body.appendChild(el);
+  setTimeout(() => { el.style.transition='opacity .5s'; el.style.opacity='0'; setTimeout(()=>el.remove(),500); }, 4500);
+}
+
 // ── 圖面貼上圖片（paste zone）───────────────────
 let drawPastedFiles = [];
 
@@ -325,12 +339,8 @@ function removeDrawPasted(idx, el) {
 
 const drawZone = document.getElementById('draw-paste-zone');
 if (drawZone) {
-  drawZone.addEventListener('focus', () => {
-    drawZone.classList.replace('draw-zone-idle', 'draw-zone-focus');
-  });
-  drawZone.addEventListener('blur', () => {
-    drawZone.classList.replace('draw-zone-focus', 'draw-zone-idle');
-  });
+  drawZone.addEventListener('focus', () => drawZone.classList.replace('draw-zone-idle', 'draw-zone-focus'));
+  drawZone.addEventListener('blur',  () => drawZone.classList.replace('draw-zone-focus', 'draw-zone-idle'));
   drawZone.addEventListener('paste', (e) => {
     e.preventDefault();
     const items = e.clipboardData?.items || [];
@@ -346,7 +356,53 @@ if (drawZone) {
         added = true;
       }
     }
-    if (!added) alert('剪貼簿中沒有圖片，請先截圖再按 Ctrl+V');
+    if (!added) showAlert('剪貼簿中沒有圖片，請先截圖再按 Ctrl+V');
+  });
+}
+
+// ── BOM 途程貼上圖片（paste zone）────────────────
+let bomPastedFiles = [];
+
+function renderBomPreview(file, idx) {
+  const previewDiv = document.getElementById('bom-preview');
+  if (!previewDiv) return;
+  const url = URL.createObjectURL(file);
+  const wrap = document.createElement('div');
+  wrap.className = 'position-relative';
+  wrap.style.cssText = 'width:90px;height:90px;border:2px solid #ffc107;border-radius:6px;overflow:hidden';
+  wrap.innerHTML = `
+    <img src="${url}" style="width:100%;height:100%;object-fit:cover">
+    <button type="button"
+      style="position:absolute;top:2px;right:2px;background:rgba(220,53,69,.85);border:none;border-radius:50%;width:20px;height:20px;color:#fff;font-size:11px;line-height:1;cursor:pointer;padding:0"
+      onclick="removeBomPasted(${idx}, this.closest('.position-relative'))">✕</button>
+    <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.5);color:#fff;font-size:9px;padding:2px 4px;overflow:hidden;white-space:nowrap">${file.name}</div>`;
+  previewDiv.appendChild(wrap);
+}
+function removeBomPasted(idx, el) {
+  bomPastedFiles[idx] = null;
+  el.remove();
+}
+
+const bomZone = document.getElementById('bom-paste-zone');
+if (bomZone) {
+  bomZone.addEventListener('focus', () => bomZone.classList.replace('bom-zone-idle', 'bom-zone-focus'));
+  bomZone.addEventListener('blur',  () => bomZone.classList.replace('bom-zone-focus', 'bom-zone-idle'));
+  bomZone.addEventListener('paste', (e) => {
+    e.preventDefault();
+    const items = e.clipboardData?.items || [];
+    let added = false;
+    for (const item of items) {
+      if (item.kind === 'file' && item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        const ext = item.type.split('/')[1] || 'png';
+        const named = new File([file], `bom_paste_${Date.now()}.${ext}`, { type: item.type });
+        const idx = bomPastedFiles.length;
+        bomPastedFiles.push(named);
+        renderBomPreview(named, idx);
+        added = true;
+      }
+    }
+    if (!added) showAlert('剪貼簿中沒有圖片，請先截圖再按 Ctrl+V');
   });
 }
 
@@ -382,17 +438,17 @@ document.querySelector('form[action*="/edit"]').addEventListener('submit', funct
   const partInputs = document.querySelectorAll('#part-number-zone .part-number-input');
   const partValues = [...partInputs].map(i => i.value.trim()).filter(Boolean);
   if (partValues.length === 0) {
-    alert('請輸入至少一筆廠內產品料號');
+    showAlert('請輸入至少一筆廠內產品料號');
     e.preventDefault();
     return;
   }
   document.getElementById('productNameHidden').value = partValues.join('\n');
 
-  // 注入貼上的圖片
-  const validPasted = drawPastedFiles.filter(Boolean);
-  if (validPasted.length > 0) {
+  // 注入圖面貼上的圖片
+  const validDraw = drawPastedFiles.filter(Boolean);
+  if (validDraw.length > 0) {
     const dt = new DataTransfer();
-    validPasted.forEach(f => dt.items.add(f));
+    validDraw.forEach(f => dt.items.add(f));
     const fi = document.createElement('input');
     fi.type = 'file'; fi.name = 'attach_files'; fi.style.display = 'none';
     Object.defineProperty(fi, 'files', { value: dt.files });
@@ -400,6 +456,20 @@ document.querySelector('form[action*="/edit"]').addEventListener('submit', funct
     const ci = document.createElement('input');
     ci.type = 'hidden'; ci.name = 'attach_categories'; ci.value = '圖面/報價單';
     this.appendChild(ci);
+  }
+
+  // 注入 BOM 途程貼上的圖片
+  const validBom = bomPastedFiles.filter(Boolean);
+  if (validBom.length > 0) {
+    const dt2 = new DataTransfer();
+    validBom.forEach(f => dt2.items.add(f));
+    const fi2 = document.createElement('input');
+    fi2.type = 'file'; fi2.name = 'attach_files'; fi2.style.display = 'none';
+    Object.defineProperty(fi2, 'files', { value: dt2.files });
+    this.appendChild(fi2);
+    const ci2 = document.createElement('input');
+    ci2.type = 'hidden'; ci2.name = 'attach_categories'; ci2.value = '料號BOM途程';
+    this.appendChild(ci2);
   }
 });
 </script>

@@ -210,12 +210,10 @@
                 <small class="text-muted ms-2">{{ doc.uploaded_at.strftime('%m/%d %H:%M') }}</small>
               </div>
               {% if can_delete %}
-              <form method="post" action="/pcn-forms/{{ form.form_id }}/delete-doc/{{ doc.id }}"
-                    onsubmit="return confirm('確定刪除此附件？')">
-                <button type="submit" class="btn btn-sm btn-outline-danger">
-                  <i class="bi bi-trash"></i>
-                </button>
-              </form>
+              <button type="button" class="btn btn-sm btn-outline-danger"
+                      onclick="deletePcnDoc({{ doc.id }}, '{{ form.form_id }}', this)">
+                <i class="bi bi-trash"></i>
+              </button>
               {% else %}
               <span class="text-muted small"><i class="bi bi-lock"></i></span>
               {% endif %}
@@ -349,6 +347,19 @@
 }
 </style>
 <script>
+// ── 刪除附件（fetch，避免巢狀 form 破壞主表單結構）──
+async function deletePcnDoc(docId, formId, btn) {
+  if (!confirm('確定刪除此附件？')) return;
+  btn.disabled = true;
+  try {
+    await fetch(`/pcn-forms/${formId}/delete-doc/${docId}`, { method: 'POST' });
+    location.reload();
+  } catch(e) {
+    showAlert('刪除失敗，請重試');
+    btn.disabled = false;
+  }
+}
+
 // ── PCN 提出時間自動填入 ─────────────────────────
 (function() {
   const d = document.getElementById('pcnSubmitDate');

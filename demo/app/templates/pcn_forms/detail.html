@@ -684,14 +684,25 @@
           {% endif %}
 
 
-          {# 送審（草稿/退回 + 建單者）#}
-          {% if form.status.value in ('DRAFT', 'RETURNED') and (user.role.value == 'admin' or form.created_by == user.id) %}
+          {# 送審（草稿 + 建單者）— RETURNED 狀態由各別重送按鈕處理 #}
+          {% if form.status.value == 'DRAFT' and (user.role.value == 'admin' or form.created_by == user.id) %}
           <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#submitModal">
             <i class="bi bi-send me-1"></i>
             {% if form.type.value == 'ECN' %}
               {% if ecn_tech_review %}送審（工程確認）{% else %}送審（直送 BU）{% endif %}
             {% else %}送審（送品保）{% endif %}
           </button>
+          {% endif %}
+
+          {# 提案單位退回後重新送 BU（BU 退回給提案者/建單者）#}
+          {% if form.status.value == 'RETURNED' and form.reject_to == '提案單位' and (user.role.value == 'admin' or form.created_by == user.id) %}
+          <form method="post" action="/pcn-forms/{{ form.form_id }}/submit"
+                onsubmit="return confirm('確認重新送交 BU Head 審核？')">
+            <input type="hidden" name="comment" value="">
+            <button type="submit" class="btn btn-primary w-100">
+              <i class="bi bi-send me-1"></i>重新送 BU 審核
+            </button>
+          </form>
           {% endif %}
 
           {# 品保退回後重新送審 → BU #}

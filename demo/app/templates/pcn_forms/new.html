@@ -140,11 +140,9 @@
             <small class="text-muted">— 區分新舊料，由工程與品保判定各站數量與處理方式</small>
           </div>
 
-          {# 填寫說明 #}
-          <div class="d-flex flex-wrap gap-2 mb-2 small">
-            <span><span class="badge bg-success-subtle text-success border border-success-subtle">提出人填寫</span> 站別、舊料號</span>
-            <span><span class="badge bg-primary-subtle text-primary border border-primary-subtle">倉庫填寫</span> 舊料庫存量</span>
-            <span><span class="badge bg-warning-subtle text-warning border border-warning-subtle">工程填寫</span> 處理方式、備註</span>
+          <div class="small text-muted mb-2">
+            <i class="bi bi-info-circle me-1 text-success"></i>
+            填入需要盤點的舊料號，庫存數量由<strong>倉管</strong>填寫，處理方式由<strong>工程</strong>判定。
           </div>
 
           <div class="table-responsive">
@@ -152,30 +150,20 @@
               <thead>
                 <tr>
                   <th style="width:36px" class="text-center bg-light">#</th>
-                  <th style="background:#d1e7dd">站別／工序<br><small class="fw-normal text-success">提出人</small></th>
-                  <th style="background:#d1e7dd">舊料號<br><small class="fw-normal text-success">提出人</small></th>
-                  <th style="background:#cfe2ff">舊料庫存量<br><small class="fw-normal text-primary">倉庫</small></th>
-                  <th style="background:#fff3cd">處理方式<br><small class="fw-normal text-warning">工程</small></th>
-                  <th style="background:#fff3cd">備註<br><small class="fw-normal text-warning">工程</small></th>
+                  <th style="background:#d1e7dd">盤點料號（舊料號）<br><small class="fw-normal text-success">提出人填寫</small></th>
+                  <th style="background:#f0f0f0;color:#aaa">舊料庫存量<br><small class="fw-normal">倉管填</small></th>
+                  <th style="background:#f0f0f0;color:#aaa">處理方式<br><small class="fw-normal">工程填</small></th>
                   <th style="width:36px" class="bg-light"></th>
                 </tr>
               </thead>
               <tbody id="inventoryBody">
                 <tr>
                   <td class="text-center text-muted row-num bg-light">1</td>
-                  <td style="background:#f0fff4"><input type="text" class="form-control form-control-sm border-0 bg-transparent inv-station" placeholder="例：SMT／組裝站"></td>
-                  <td style="background:#f0fff4"><input type="text" class="form-control form-control-sm border-0 bg-transparent inv-old-pn" placeholder="舊料號"></td>
-                  <td style="background:#f0f8ff"><input type="number" class="form-control form-control-sm border-0 bg-transparent inv-qty" placeholder="0" min="0"></td>
-                  <td style="background:#fffdf0">
-                    <select class="form-select form-select-sm border-0 bg-transparent inv-action">
-                      <option value="">— 待工程品保判定 —</option>
-                      <option value="使用完畢">使用完畢（繼續消耗）</option>
-                      <option value="報廢">報廢處理</option>
-                      <option value="退供應商">退回供應商</option>
-                      <option value="轉移使用">轉移至其他專案</option>
-                    </select>
+                  <td style="background:#f0fff4">
+                    <input type="text" class="form-control form-control-sm border-0 bg-transparent inv-old-pn" placeholder="例：HT-A001">
                   </td>
-                  <td style="background:#fffdf0"><input type="text" class="form-control form-control-sm border-0 bg-transparent inv-remark" placeholder="補充說明..."></td>
+                  <td class="text-center text-muted small" style="background:#f8f8f8">—</td>
+                  <td class="text-center text-muted small" style="background:#f8f8f8">—</td>
                   <td class="text-center bg-light">
                     <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1"
                             onclick="removeInvRow(this)" style="visibility:hidden">
@@ -360,19 +348,11 @@ function addInvRow() {
   const tr = document.createElement('tr');
   tr.innerHTML = `
     <td class="text-center text-muted row-num bg-light">${rowCount}</td>
-    <td style="background:#f0fff4"><input type="text" class="form-control form-control-sm border-0 bg-transparent inv-station" placeholder="例：SMT／組裝站"></td>
-    <td style="background:#f0fff4"><input type="text" class="form-control form-control-sm border-0 bg-transparent inv-old-pn" placeholder="舊料號"></td>
-    <td style="background:#f0f8ff"><input type="number" class="form-control form-control-sm border-0 bg-transparent inv-qty" placeholder="0" min="0"></td>
-    <td style="background:#fffdf0">
-      <select class="form-select form-select-sm border-0 bg-transparent inv-action">
-        <option value="">— 待工程品保判定 —</option>
-        <option value="使用完畢">使用完畢（繼續消耗）</option>
-        <option value="報廢">報廢處理</option>
-        <option value="退供應商">退回供應商</option>
-        <option value="轉移使用">轉移至其他專案</option>
-      </select>
+    <td style="background:#f0fff4">
+      <input type="text" class="form-control form-control-sm border-0 bg-transparent inv-old-pn" placeholder="例：HT-A001">
     </td>
-    <td style="background:#fffdf0"><input type="text" class="form-control form-control-sm border-0 bg-transparent inv-remark" placeholder="補充說明..."></td>
+    <td class="text-center text-muted small" style="background:#f8f8f8">—</td>
+    <td class="text-center text-muted small" style="background:#f8f8f8">—</td>
     <td class="text-center bg-light">
       <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1"
               onclick="removeInvRow(this)">
@@ -399,13 +379,16 @@ function collectInventoryData() {
   const rows = document.querySelectorAll('#inventoryBody tr');
   const data = [];
   rows.forEach(row => {
-    data.push({
-      station: row.querySelector('.inv-station')?.value.trim() || '',
-      old_pn:  row.querySelector('.inv-old-pn')?.value.trim() || '',
-      qty:     row.querySelector('.inv-qty')?.value.trim() || '',
-      action:  row.querySelector('.inv-action')?.value || '',
-      remark:  row.querySelector('.inv-remark')?.value.trim() || '',
-    });
+    const pn = row.querySelector('.inv-old-pn')?.value.trim() || '';
+    if (pn) {
+      data.push({
+        station: '',
+        old_pn:  pn,
+        qty:     '',
+        action:  '',
+        remark:  '',
+      });
+    }
   });
   return data;
 }

@@ -54,6 +54,8 @@ async def run_migrations():
         "ALTER TABLE pcn_forms ADD COLUMN inventory_data TEXT",
         # 新增採購帳號 pc01（若舊 purchase01 存在則改名）
         "UPDATE users SET username='pc01' WHERE username='purchase01'",
+        # PCNForm 退回對象欄位（供列表過濾）
+        "ALTER TABLE pcn_forms ADD COLUMN reject_to VARCHAR(50)",
     ]
     async with engine.begin() as conn:
         for sql in migrations:

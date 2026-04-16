@@ -41,6 +41,7 @@ class PCNForm(Base):
     effective_date       = Column(String(20), nullable=True)
     change_types         = Column(Text, nullable=True)   # JSON 陣列，ECN 變更類型
     inventory_data       = Column(Text, nullable=True)   # JSON，ECN 設計變更庫存盤點
+    reject_to            = Column(String(50), nullable=True)  # 最新退回對象（工程師/品保/提案單位）
     created_by           = Column(Integer, ForeignKey("users.id"), nullable=False)
     assigned_qc_id       = Column(Integer, ForeignKey("users.id"), nullable=True)
     assigned_prod_mgr_id = Column(Integer, ForeignKey("users.id"), nullable=True)

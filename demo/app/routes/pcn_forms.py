@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Request, Form, UploadFile, File, HTTPExc
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, and_
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
@@ -111,16 +111,20 @@ async def list_pcn_forms(
     if current_user.role in (Role.ADMIN, Role.BU):
         pass  # 看全部
     elif current_user.role == Role.ENGINEER:
-        # 自建 + 所有待工程確認的 ECN
+        # 自建 + 待工程確認 + 退回給工程師
         q = q.where(or_(
             PCNForm.created_by == current_user.id,
             PCNForm.status == PCNFormStatus.ECN_PENDING_ENG,
+            and_(PCNForm.status == PCNFormStatus.RETURNED,
+                 PCNForm.reject_to == "工程師"),
         ))
     elif current_user.role == Role.QC:
-        # PCN 待品保 + ECN 待品保確認
+        # PCN 待品保 + ECN 待品保確認 + 退回給品保
         q = q.where(or_(
             PCNForm.status == PCNFormStatus.PENDING_QC,
             PCNForm.status == PCNFormStatus.ECN_PENDING_QC,
+            and_(PCNForm.status == PCNFormStatus.RETURNED,
+                 PCNForm.reject_to == "品保"),
         ))
     elif current_user.role == Role.WAREHOUSE:
         # 倉管看待庫存盤點的單
@@ -701,6 +705,7 @@ async def reject_pcn_form(
         raise HTTPException(status_code=400, detail="退回原因不得為空")
     old = form.status
     form.status     = PCNFormStatus.RETURNED
+    form.reject_to  = reject_target   # 儲存退回對象供列表過濾
     form.updated_at = datetime.utcnow()
     db.add(form)
     db.add(PCNApproval(

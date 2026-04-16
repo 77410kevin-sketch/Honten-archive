@@ -131,7 +131,7 @@
         </div>
         <div class="card-body">
           <div class="row g-2 mb-3">
-            <div class="col-sm-4"><span class="text-muted small">提出部門</span><div class="fw-semibold">{{ form.department or '—' }}</div></div>
+            <div class="col-sm-4"><span class="text-muted small">{% if form.type.value == 'PCN' %}提出人{% else %}提出部門{% endif %}</span><div class="fw-semibold">{{ form.department or '—' }}</div></div>
             <div class="col-sm-4"><span class="text-muted small">廠內產品料號</span><div class="fw-semibold">{% for pn in form.product_name.split('\n') %}{% if pn.strip() %}<span class="badge bg-secondary me-1 mb-1">{{ pn.strip() }}</span>{% endif %}{% endfor %}</div></div>
             <div class="col-sm-4"><span class="text-muted small">機種名稱</span><div>{{ form.product_model or '—' }}</div></div>
           </div>
@@ -161,7 +161,7 @@
           {% endif %}
           <div class="row g-2 mb-3">
             <div class="col-sm-4"><span class="text-muted small">建單者</span><div>{{ form.creator.display_name if form.creator else '—' }}</div></div>
-            <div class="col-sm-4"><span class="text-muted small">預計生效日期</span><div>{{ form.effective_date or '—' }}</div></div>
+            <div class="col-sm-4"><span class="text-muted small">{% if form.type.value == 'PCN' %}提出時間{% else %}預計生效日期{% endif %}</span><div>{{ form.effective_date or '—' }}</div></div>
             <div class="col-sm-4"><span class="text-muted small">建立日期</span><div>{{ form.created_at.strftime('%Y-%m-%d %H:%M') }}</div></div>
           </div>
           <hr class="my-2">

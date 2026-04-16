@@ -409,9 +409,31 @@ async def delete_pcn_doc(
     form = await _get_form_or_404(form_id, db)
     if form.status not in (PCNFormStatus.DRAFT, PCNFormStatus.RETURNED):
         raise HTTPException(status_code=403)
+    is_creator = (current_user.role == Role.ADMIN or form.created_by == current_user.id)
+    ret = form.status == PCNFormStatus.RETURNED
+    is_qc_ret   = (current_user.role == Role.QC       and ret and form.reject_to == "品保")
+    is_prod_ret = (current_user.role == Role.PROD_MGR and ret and form.reject_to == "產線主管")
+    is_wh_ret   = (current_user.role == Role.WAREHOUSE and ret and form.reject_to == "倉管")
+    if not is_creator and not is_qc_ret and not is_prod_ret and not is_wh_ret:
+        raise HTTPException(status_code=403)
+
     doc_r = await db.execute(select(PCNDocument).where(PCNDocument.id == doc_id))
     doc   = doc_r.scalars().first()
     if doc and doc.form_id_fk == form.id:
+        # 各限縮角色只能刪除自己負責的類別或「其它」
+        ROLE_ALLOWED_CATS = {
+            "qc_ret":   {"SIP檢表", "其它"},
+            "prod_ret": {"作業SOP", "其它"},
+            "wh_ret":   {"包裝SOP", "其它"},
+        }
+        doc_cat = doc.category or "其它"
+        if is_qc_ret   and doc_cat not in ROLE_ALLOWED_CATS["qc_ret"]:
+            raise HTTPException(status_code=403, detail="無權限刪除此附件類別")
+        if is_prod_ret and doc_cat not in ROLE_ALLOWED_CATS["prod_ret"]:
+            raise HTTPException(status_code=403, detail="無權限刪除此附件類別")
+        if is_wh_ret   and doc_cat not in ROLE_ALLOWED_CATS["wh_ret"]:
+            raise HTTPException(status_code=403, detail="無權限刪除此附件類別")
+
         fp = os.path.join(UPLOAD_BASE, f"pcn_{form.id}", doc.filename)
         if os.path.exists(fp):
             os.remove(fp)

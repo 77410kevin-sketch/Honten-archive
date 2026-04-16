@@ -82,7 +82,7 @@
           <label class="form-label fw-semibold" id="labelReason">
             <span id="reasonLabelText">變更原因</span>
           </label>
-          <textarea name="change_reason" class="form-control" rows="2"
+          <textarea name="change_reason" class="form-control" rows="3"
             id="reasonTextarea" placeholder=""></textarea>
         </div>
 
@@ -276,6 +276,23 @@
 </style>
 
 <script>
+// ── 漂亮警示框 ──────────────────────────────────
+function showAlert(msg) {
+  const box = document.createElement('div');
+  box.style.cssText = 'position:fixed;top:24px;left:50%;transform:translateX(-50%);z-index:9999;min-width:320px;max-width:500px';
+  box.innerHTML = `
+    <div class="alert alert-danger d-flex align-items-start gap-3 shadow-lg rounded-3 p-3" role="alert">
+      <i class="bi bi-exclamation-triangle-fill fs-4 flex-shrink-0 mt-1"></i>
+      <div>
+        <div class="fw-bold mb-1">送出前請確認</div>
+        <div class="small">${msg}</div>
+      </div>
+      <button type="button" class="btn-close ms-auto flex-shrink-0" onclick="this.closest('.alert').parentElement.remove()"></button>
+    </div>`;
+  document.body.appendChild(box);
+  setTimeout(() => { if (box.parentNode) box.remove(); }, 5000);
+}
+
 // ── PCN/ECN 動態欄位切換 ────────────────────────
 const typeSelect = document.getElementById('pcnTypeSelect');
 const ecnSection = document.getElementById('ecnChangeTypesSection');
@@ -520,15 +537,28 @@ function renderPreview(file, idx, previewId, borderColor, label, fileArr) {
 
 // ── 送出攔截：收集料號 + 庫存盤點 + 貼上圖片 ──
 document.getElementById('pcnForm').addEventListener('submit', function(e) {
+  const isPCN = document.getElementById('pcnTypeSelect').value === 'PCN';
+
   // 收集廠內產品料號
   const partInputs = document.querySelectorAll('#part-number-zone .part-number-input');
   const partValues = [...partInputs].map(i => i.value.trim()).filter(Boolean);
   if (partValues.length === 0) {
-    alert('請輸入至少一筆廠內產品料號');
+    showAlert('請輸入至少一筆廠內產品料號');
     e.preventDefault();
     return;
   }
   document.getElementById('productNameHidden').value = partValues.join('\n');
+
+  // PCN 必填：各製程包裝說明
+  if (isPCN) {
+    const pkg = document.getElementById('reasonTextarea')?.value.trim();
+    if (!pkg) {
+      showAlert('PCN 送出前請填寫【各製程包裝說明】');
+      document.getElementById('reasonTextarea').focus();
+      e.preventDefault();
+      return;
+    }
+  }
 
   updateChangeTypes();
 
@@ -561,7 +591,7 @@ document.getElementById('pcnForm').addEventListener('submit', function(e) {
   fetch(this.action, { method: 'POST', body: formData })
     .then(res => { window.location.href = res.url; })
     .catch(() => {
-      alert('上傳失敗，請重試');
+      showAlert('上傳失敗，請重試');
       btn.disabled = false;
       btn.innerHTML = '<i class="bi bi-floppy me-1"></i>儲存草稿';
     });

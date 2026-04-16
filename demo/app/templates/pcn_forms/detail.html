@@ -683,12 +683,6 @@
           </a>
           {% endif %}
 
-          {# 編輯（退回給品保 + 品保/admin）#}
-          {% if form.status.value == 'RETURNED' and form.reject_to == '品保' and user.role.value in ('qc', 'admin') %}
-          <a href="/pcn-forms/{{ form.form_id }}/edit" class="btn btn-outline-warning">
-            <i class="bi bi-pencil me-1"></i>編輯（品保）
-          </a>
-          {% endif %}
 
           {# 送審（草稿/退回 + 建單者）#}
           {% if form.status.value in ('DRAFT', 'RETURNED') and (user.role.value == 'admin' or form.created_by == user.id) %}
@@ -700,7 +694,7 @@
           </button>
           {% endif %}
 
-          {# 品保退回後重新送審 #}
+          {# 品保退回後重新送審 → BU #}
           {% if form.status.value == 'RETURNED' and form.reject_to == '品保' and user.role.value in ('qc', 'admin') %}
           <form method="post" action="/pcn-forms/{{ form.form_id }}/qc-resubmit"
                 onsubmit="return confirm('確認重新送交 BU Head 審核？')">
@@ -711,15 +705,55 @@
           </form>
           {% endif %}
 
-          {# 工程師退回後重新送審 #}
-          {% if form.status.value == 'RETURNED' and form.reject_to == '工程師' and user.role.value in ('engineer', 'admin') %}
+          {# 工程師退回（BU退）→ BU；（QC退）→ 品保 #}
+          {% if form.status.value == 'RETURNED' and form.reject_to in ('工程師','工程師_QC') and user.role.value in ('engineer', 'admin') %}
           <form method="post" action="/pcn-forms/{{ form.form_id }}/eng-resubmit"
-                onsubmit="return confirm('確認重新送交 BU Head 審核？')">
+                onsubmit="return confirm('確認重新送審？')">
             <input type="hidden" name="comment" value="">
             <button type="submit" class="btn btn-primary w-100">
+              <i class="bi bi-send me-1"></i>
+              {% if form.reject_to == '工程師_QC' %}重新送品保確認{% else %}重新送 BU 審核{% endif %}
+            </button>
+          </form>
+          {% endif %}
+
+          {# 產線主管退回後重新送 BU #}
+          {% if form.status.value == 'RETURNED' and form.reject_to == '產線主管' and user.role.value in ('prod_mgr', 'admin') %}
+          <form method="post" action="/pcn-forms/{{ form.form_id }}/prod-resubmit"
+                onsubmit="return confirm('確認重新送交 BU Head 審核？')">
+            <input type="hidden" name="comment" value="">
+            <button type="submit" class="btn btn-info text-dark w-100">
               <i class="bi bi-send me-1"></i>重新送 BU 審核
             </button>
           </form>
+          {% endif %}
+
+          {# 倉管退回後重新送 BU #}
+          {% if form.status.value == 'RETURNED' and form.reject_to == '倉管' and user.role.value in ('warehouse', 'admin') %}
+          <form method="post" action="/pcn-forms/{{ form.form_id }}/wh-resubmit"
+                onsubmit="return confirm('確認重新送交 BU Head 審核？')">
+            <input type="hidden" name="comment" value="">
+            <button type="submit" class="btn fw-semibold text-white w-100" style="background:#fd7e14">
+              <i class="bi bi-send me-1"></i>重新送 BU 審核
+            </button>
+          </form>
+          {% endif %}
+
+          {# 各退回角色的編輯按鈕 #}
+          {% if form.status.value == 'RETURNED' %}
+            {% if form.reject_to == '品保' and user.role.value in ('qc', 'admin') %}
+            <a href="/pcn-forms/{{ form.form_id }}/edit" class="btn btn-outline-warning w-100">
+              <i class="bi bi-pencil me-1"></i>編輯（品保）
+            </a>
+            {% elif form.reject_to == '產線主管' and user.role.value in ('prod_mgr', 'admin') %}
+            <a href="/pcn-forms/{{ form.form_id }}/edit" class="btn btn-outline-warning w-100">
+              <i class="bi bi-pencil me-1"></i>編輯（產線主管）
+            </a>
+            {% elif form.reject_to == '倉管' and user.role.value in ('warehouse', 'admin') %}
+            <a href="/pcn-forms/{{ form.form_id }}/edit" class="btn btn-outline-warning w-100">
+              <i class="bi bi-pencil me-1"></i>編輯（倉管）
+            </a>
+            {% endif %}
           {% endif %}
 
           {# BU Head 核准/退回 #}
@@ -836,22 +870,54 @@
         <div class="modal-body">
           {% if form.type.value == 'ECN' %}
             {% if ecn_tech_review %}
-            <div class="alert alert-info small mb-3">
-              <i class="bi bi-info-circle me-1"></i>
-              此 ECN 包含<strong>技術類變更</strong>，送審後流程：<br>
-              <strong>工程師確認意見</strong> → <strong>品保確認意見</strong> → <strong>BU Head 審核</strong>
+            <div class="rounded-3 p-3 mb-3" style="background:#e8f4fd;border:1.5px solid #0d6efd">
+              <div class="fw-semibold mb-2" style="color:#0a58ca"><i class="bi bi-diagram-3 me-1"></i>審核流程</div>
+              <div class="d-flex align-items-center gap-2 flex-wrap small">
+                <span class="badge bg-primary">工程確認</span>
+                <i class="bi bi-arrow-right text-muted"></i>
+                <span class="badge" style="background:#6f42c1">品保確認</span>
+                <i class="bi bi-arrow-right text-muted"></i>
+                <span class="badge bg-success">BU Head 審核</span>
+              </div>
             </div>
             {% else %}
-            <div class="alert alert-warning small mb-3">
-              <i class="bi bi-lightning-charge me-1"></i>
-              此 ECN 為<strong>商業類變更</strong>（售價/成本），送審後將直接送交 <strong>BU Head 審核</strong>，無需工程與品保確認。
+            <div class="rounded-3 p-3 mb-3" style="background:#fff8e0;border:1.5px solid #ffc107">
+              <div class="fw-semibold mb-1" style="color:#856404"><i class="bi bi-lightning-charge me-1"></i>商業類快速審核</div>
+              <div class="small text-muted">售價/成本變更直接送 <strong>BU Head 審核</strong>，無需工程與品保確認。</div>
             </div>
             {% endif %}
           {% else %}
-          <div class="alert alert-info small mb-3">
-            送審後將通知<strong>品保人員</strong>填寫 SIP 檢表，再由<strong>產線主管</strong>填寫 SOP。<br>
-            ⚠ 請確認已上傳<strong>圖面/報價單</strong>附件。
+          {# PCN 流程說明 #}
+          <div class="rounded-3 p-3 mb-3" style="background:#e8f4fd;border:1.5px solid #0d6efd">
+            <div class="fw-semibold mb-2" style="color:#0a58ca"><i class="bi bi-diagram-3 me-1"></i>PCN 審核流程</div>
+            <div class="d-flex align-items-center gap-2 flex-wrap small mb-2">
+              <span class="badge bg-primary">品保 SIP</span>
+              <i class="bi bi-arrow-right text-muted"></i>
+              <span class="badge bg-info text-dark">產線 SOP</span>
+              <i class="bi bi-arrow-right text-muted"></i>
+              <span class="badge" style="background:#fd7e14">倉管包裝SOP</span>
+              <i class="bi bi-arrow-right text-muted"></i>
+              <span class="badge bg-success">BU 審核</span>
+            </div>
           </div>
+          {# 必要附件檢核 #}
+          {% set has_drawing = '圖面/報價單' in docs_by_cat %}
+          {% set has_bom = '料號BOM途程' in docs_by_cat %}
+          {% if not has_drawing or not has_bom %}
+          <div class="rounded-3 p-3 mb-3" style="background:#fff3cd;border:1.5px solid #ffc107">
+            <div class="fw-semibold mb-2" style="color:#856404"><i class="bi bi-exclamation-triangle-fill me-1"></i>送審前必要附件</div>
+            <div class="small">
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <i class="bi bi-{{ 'check-circle-fill text-success' if has_drawing else 'x-circle-fill text-danger' }}"></i>
+                <span class="{{ 'text-success' if has_drawing else 'text-danger fw-semibold' }}">圖面／報價單 {{ '' if has_drawing else '— 尚未上傳！' }}</span>
+              </div>
+              <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-{{ 'check-circle-fill text-success' if has_bom else 'x-circle-fill text-danger' }}"></i>
+                <span class="{{ 'text-success' if has_bom else 'text-danger fw-semibold' }}">料號 BOM 途程 {{ '' if has_bom else '— 尚未上傳！' }}</span>
+              </div>
+            </div>
+          </div>
+          {% endif %}
           {% endif %}
           <label class="form-label fw-semibold">備註（選填）</label>
           <textarea name="comment" class="form-control" rows="3" placeholder="補充說明..."></textarea>
@@ -924,11 +990,21 @@
           <div class="mb-3">
             <label class="form-label fw-semibold">退回對象 <span class="text-danger">*</span></label>
             <select name="reject_target" class="form-select" required>
-              {% if form.type.value == 'ECN' and ecn_tech_review %}
+              {% if form.type.value == 'PCN' %}
+              {# PCN：可退回每一站 #}
+              <option value="工程師">工程師（調整圖面/BOM/包裝說明）</option>
+              <option value="品保">品保（重新確認 SIP）</option>
+              <option value="產線主管">產線主管（修改作業 SOP）</option>
+              <option value="倉管">倉管（修改包裝 SOP）</option>
+              <option value="提案單位">提案單位（修改後重新送審）</option>
+              {% elif form.type.value == 'ECN' and ecn_tech_review %}
+              {# ECN 技術類：退回工程/品保/提案 #}
               <option value="工程師">工程師（重新確認技術可行性）</option>
               <option value="品保">品保（重新確認品質影響）</option>
+              <option value="提案單位">提案單位（修改後重新送審）</option>
+              {% else %}
+              <option value="提案單位" selected>提案單位（修改後重新送審）</option>
               {% endif %}
-              <option value="提案單位" {% if not (form.type.value == 'ECN' and ecn_tech_review) %}selected{% endif %}>提案單位（修改後重新送審）</option>
             </select>
           </div>
           <div class="mb-1">

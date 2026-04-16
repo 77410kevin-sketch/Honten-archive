@@ -173,14 +173,15 @@
         {# ── 補充上傳附件 ── #}
         <h6 class="fw-bold text-secondary border-bottom pb-1 mb-3">補充上傳附件</h6>
 
-        {# 圖面補充 #}
-        <div class="mb-3 p-3 border rounded bg-light">
-          <label class="form-label fw-semibold"><i class="bi bi-file-earmark-image me-1 text-primary"></i>補充圖面／報價單</label>
-          <div id="drawing-zone">
-            <div class="d-flex gap-2 mb-2">
-              <input type="file" name="attach_files" class="form-control" accept="image/*,application/pdf" onchange="addDrawingFile(this)">
-              <input type="hidden" name="attach_categories" value="圖面/報價單">
-            </div>
+        {# 圖面 / 報價單 #}
+        <div class="mb-3 p-3 border rounded" style="background:#f8f9ff;border-color:#86b7fe!important">
+          <label class="form-label fw-semibold">
+            <i class="bi bi-file-earmark-image me-1 text-primary"></i>補充圖面／報價單
+            <span class="badge bg-primary ms-1 fw-normal small">支援截圖貼上</span>
+          </label>
+          <div class="d-flex gap-2 mb-2">
+            <input type="file" name="attach_files" class="form-control" accept="image/*,application/pdf,.dwg,.dxf,.xlsx,.xls">
+            <input type="hidden" name="attach_categories" value="圖面/報價單">
           </div>
           <div id="draw-paste-zone" tabindex="0"
                class="border border-2 rounded p-3 text-center mb-2 draw-zone-idle"
@@ -190,7 +191,30 @@
             <div class="text-muted small">點此區域，然後按 <kbd>Ctrl+V</kbd> 貼上截圖</div>
             <div id="draw-preview" class="mt-2 d-flex flex-wrap gap-2 justify-content-center"></div>
           </div>
+          <div class="form-text">支援 PDF、DWG、PNG、JPG、Excel 等</div>
         </div>
+
+        {# 料號 BOM 途程（PCN 時顯示）#}
+        {% if form.type.value == 'PCN' %}
+        <div class="mb-3 p-3 border rounded" style="background:#fffdf0;border-color:#ffc107!important">
+          <label class="form-label fw-semibold">
+            <i class="bi bi-grid-3x3 me-1 text-warning"></i>補充料號 BOM 途程
+            <span class="badge bg-warning text-dark ms-1 fw-normal small">支援截圖貼上</span>
+          </label>
+          <div class="d-flex gap-2 mb-2">
+            <input type="file" name="attach_files" class="form-control" accept="image/*,application/pdf,.xlsx,.xls">
+            <input type="hidden" name="attach_categories" value="料號BOM途程">
+          </div>
+          <div id="bom-paste-zone" tabindex="0"
+               class="border border-2 rounded p-3 text-center mb-2 bom-zone-idle"
+               style="cursor:pointer;min-height:72px;outline:none;transition:all .2s"
+               onclick="this.focus()">
+            <i class="bi bi-clipboard-image fs-3 text-warning d-block mb-1"></i>
+            <div class="text-muted small">點此區域，然後按 <kbd>Ctrl+V</kbd> 貼上截圖</div>
+            <div id="bom-preview" class="mt-2 d-flex flex-wrap gap-2 justify-content-center"></div>
+          </div>
+        </div>
+        {% endif %}
 
         {# 其它附件 #}
         <div class="mb-4 p-3 border rounded bg-light">
@@ -220,6 +244,8 @@
 <style>
 .draw-zone-idle { background: #f8f9ff; border-color: #86b7fe !important; }
 .draw-zone-focus { background: #e8f0ff; border-color: #0d6efd !important; box-shadow: 0 0 0 3px rgba(13,110,253,.15); }
+.bom-zone-idle  { background: #fffef0; border-color: #ffc107 !important; }
+.bom-zone-focus { background: #fff8d0; border-color: #e0a800 !important; box-shadow: 0 0 0 3px rgba(255,193,7,.2); }
 </style>
 <script>
 // ── ECN 變更類型 hint ────────────────────────────

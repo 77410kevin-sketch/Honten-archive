@@ -268,8 +268,8 @@
                 <thead>
                   <tr>
                     <th class="bg-light text-center" style="width:36px">#</th>
-                    <th style="background:#d1e7dd">站別／工序</th>
                     <th style="background:#d1e7dd">舊料號</th>
+                    <th style="background:#cfe2ff">站別／工序<br><small class="fw-normal text-primary">倉管填寫</small></th>
                     <th style="background:#cfe2ff">舊料庫存量 <span class="text-danger">*</span><br><small class="fw-normal text-primary">倉管填寫</small></th>
                     <th style="background:#f8f9fa">處理方式</th>
                     <th style="background:#f8f9fa">備註</th>
@@ -279,8 +279,12 @@
                   {% for row in inventory_rows %}
                   <tr>
                     <td class="text-center text-muted bg-light">{{ loop.index }}</td>
-                    <td style="background:#f0fff4">{{ row.station or '—' }}</td>
                     <td style="background:#f0fff4">{{ row.old_pn or '—' }}</td>
+                    <td style="background:#f0f8ff">
+                      <input type="text" class="form-control form-control-sm wh-station"
+                             data-idx="{{ loop.index0 }}" value="{{ row.station or '' }}"
+                             placeholder="例：SMT / 倉庫">
+                    </td>
                     <td style="background:#f0f8ff">
                       <input type="number" class="form-control form-control-sm wh-qty"
                              data-idx="{{ loop.index0 }}" value="{{ row.qty or '' }}"
@@ -329,8 +333,8 @@
                   <thead>
                     <tr>
                       <th class="bg-light text-center" style="width:36px">#</th>
-                      <th style="background:#d1e7dd">站別／工序</th>
                       <th style="background:#d1e7dd">舊料號</th>
+                      <th style="background:#d1e7dd">站別／工序</th>
                       <th style="background:#cfe2ff">舊料庫存量</th>
                       <th style="background:#fff3cd">處理方式 <span class="text-danger">*</span><br><small class="fw-normal text-warning">工程填寫</small></th>
                       <th style="background:#fff3cd">備註<br><small class="fw-normal text-warning">工程填寫</small></th>
@@ -340,8 +344,8 @@
                     {% for row in inventory_rows %}
                     <tr>
                       <td class="text-center text-muted bg-light">{{ loop.index }}</td>
-                      <td style="background:#f0fff4">{{ row.station or '—' }}</td>
                       <td style="background:#f0fff4">{{ row.old_pn or '—' }}</td>
+                      <td style="background:#f0fff4">{{ row.station or '—' }}</td>
                       <td class="text-center" style="background:#f0f8ff">{{ row.qty or '0' }}</td>
                       <td style="background:#fffdf0">
                         <select class="form-select form-select-sm eng-action" data-idx="{{ loop.index0 }}">
@@ -349,7 +353,7 @@
                           <option value="使用完畢" {% if row.action == '使用完畢' %}selected{% endif %}>使用完畢（繼續消耗）</option>
                           <option value="報廢" {% if row.action == '報廢' %}selected{% endif %}>報廢處理</option>
                           <option value="退供應商" {% if row.action == '退供應商' %}selected{% endif %}>退回供應商</option>
-                          <option value="轉移使用" {% if row.action == '轉移使用' %}selected{% endif %}>轉移至其他專案</option>
+                          <option value="重新整修加工" {% if row.action == '重新整修加工' %}selected{% endif %}>重新整修加工</option>
                         </select>
                       </td>
                       <td style="background:#fffdf0">
@@ -395,6 +399,41 @@
           <div class="mb-3 p-2 border rounded bg-light small">
             <div class="text-muted mb-1"><i class="bi bi-wrench me-1"></i>工程確認意見（{{ eng_approval.approver.display_name if eng_approval.approver else '—' }}）</div>
             <div style="white-space:pre-wrap">{{ eng_approval.comment }}</div>
+          </div>
+          {% endif %}
+          {# 顯示庫存盤點資訊供品保參考 #}
+          {% if inventory_rows %}
+          <div class="mb-3">
+            <div class="fw-semibold small mb-2"><i class="bi bi-boxes me-1 text-success"></i>庫存盤點資訊（僅供參考）</div>
+            <div class="table-responsive">
+              <table class="table table-bordered table-sm align-middle">
+                <thead>
+                  <tr>
+                    <th class="bg-light text-center" style="width:36px">#</th>
+                    <th style="background:#d1e7dd">舊料號</th>
+                    <th style="background:#d1e7dd">站別／工序</th>
+                    <th style="background:#cfe2ff;text-align:center">庫存量</th>
+                    <th style="background:#fff3cd">處理方式</th>
+                    <th style="background:#f8f9fa">備註</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in inventory_rows %}
+                  <tr>
+                    <td class="text-center text-muted bg-light">{{ loop.index }}</td>
+                    <td style="background:#f0fff4">{{ row.old_pn or '—' }}</td>
+                    <td style="background:#f0fff4">{{ row.station or '—' }}</td>
+                    <td class="text-center" style="background:#f0f8ff">{{ row.qty or '—' }}</td>
+                    <td style="background:#fffdf0">
+                      {% if row.action %}<span class="badge bg-warning text-dark">{{ row.action }}</span>
+                      {% else %}<span class="text-muted small">— 待判定 —</span>{% endif %}
+                    </td>
+                    <td class="small text-muted">{{ row.remark or '' }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
           </div>
           {% endif %}
           <form method="post" action="/pcn-forms/{{ form.form_id }}/ecn-qc-confirm">
@@ -540,6 +579,7 @@
                 <tr>
                   <th class="bg-light text-center" style="width:36px">#</th>
                   <th style="background:#d1e7dd">舊料號</th>
+                  <th style="background:#d1e7dd">站別／工序</th>
                   <th style="background:#cfe2ff;text-align:center">舊料庫存量</th>
                   <th style="background:#fff3cd">處理方式</th>
                   <th style="background:#f8f9fa">備註</th>
@@ -550,6 +590,7 @@
                 <tr>
                   <td class="text-center text-muted bg-light">{{ loop.index }}</td>
                   <td style="background:#f0fff4">{{ row.old_pn or '—' }}</td>
+                  <td style="background:#f0fff4">{{ row.station or '—' }}</td>
                   <td class="text-center" style="background:#f0f8ff">
                     {% if row.qty %}{{ row.qty }}{% else %}<span class="text-muted">—</span>{% endif %}
                   </td>
@@ -589,6 +630,28 @@
               {% if ecn_tech_review %}送審（工程確認）{% else %}送審（直送 BU）{% endif %}
             {% else %}送審（送品保）{% endif %}
           </button>
+          {% endif %}
+
+          {# 品保退回後重新送審 #}
+          {% if form.status.value == 'RETURNED' and form.reject_to == '品保' and user.role.value in ('qc', 'admin') %}
+          <form method="post" action="/pcn-forms/{{ form.form_id }}/qc-resubmit"
+                onsubmit="return confirm('確認重新送交 BU Head 審核？')">
+            <input type="hidden" name="comment" value="">
+            <button type="submit" class="btn text-white w-100" style="background:#6f42c1">
+              <i class="bi bi-send me-1"></i>重新送 BU 審核
+            </button>
+          </form>
+          {% endif %}
+
+          {# 工程師退回後重新送審 #}
+          {% if form.status.value == 'RETURNED' and form.reject_to == '工程師' and user.role.value in ('engineer', 'admin') %}
+          <form method="post" action="/pcn-forms/{{ form.form_id }}/eng-resubmit"
+                onsubmit="return confirm('確認重新送交品保確認？')">
+            <input type="hidden" name="comment" value="">
+            <button type="submit" class="btn btn-primary w-100">
+              <i class="bi bi-send me-1"></i>重新送品保確認
+            </button>
+          </form>
           {% endif %}
 
           {# BU Head 核准/退回 #}
@@ -837,8 +900,12 @@ function collectWhInventory() {
   if (!rows.length) return;
   const original = {{ inventory_rows | tojson }};
   rows.forEach((tr, i) => {
-    const qty = tr.querySelector('.wh-qty');
-    if (qty && original[i] !== undefined) original[i].qty = qty.value.trim();
+    const station = tr.querySelector('.wh-station');
+    const qty     = tr.querySelector('.wh-qty');
+    if (original[i] !== undefined) {
+      if (station) original[i].station = station.value.trim();
+      if (qty)     original[i].qty     = qty.value.trim();
+    }
   });
   const hidden = document.getElementById('whInvDataHidden');
   if (hidden) hidden.value = JSON.stringify(original);

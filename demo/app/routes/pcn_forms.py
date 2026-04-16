@@ -538,6 +538,64 @@ async def ecn_qc_confirm(
     return RedirectResponse(url=f"/pcn-forms/{form_id}", status_code=303)
 
 
+# ── 退回後重新送審（QC）─────────────────────────────
+
+@router.post("/{form_id}/qc-resubmit")
+async def qc_resubmit(
+    form_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    comment: str = Form(""),
+):
+    """品保在退回狀態重新送 BU 審核"""
+    form = await _get_form_or_404(form_id, db)
+    if form.status != PCNFormStatus.RETURNED or form.reject_to != "品保":
+        raise HTTPException(status_code=400, detail="目前狀態不允許品保重新送審")
+    if current_user.role not in (Role.QC, Role.ADMIN):
+        raise HTTPException(status_code=403)
+    old = form.status
+    form.status     = PCNFormStatus.PENDING_BU_APPROVAL
+    form.reject_to  = None
+    form.updated_at = datetime.utcnow()
+    db.add(form)
+    db.add(PCNApproval(
+        form_id_fk=form.id, approver_id=current_user.id, action="QC_RESUBMIT",
+        comment=comment or None, from_status=old.value,
+        to_status=PCNFormStatus.PENDING_BU_APPROVAL.value,
+    ))
+    await db.commit()
+    return RedirectResponse(url=f"/pcn-forms/{form_id}", status_code=303)
+
+
+# ── 退回後重新送審（工程師）────────────────────────
+
+@router.post("/{form_id}/eng-resubmit")
+async def eng_resubmit(
+    form_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    comment: str = Form(""),
+):
+    """工程師在退回狀態重新送品保確認"""
+    form = await _get_form_or_404(form_id, db)
+    if form.status != PCNFormStatus.RETURNED or form.reject_to != "工程師":
+        raise HTTPException(status_code=400, detail="目前狀態不允許工程師重新送審")
+    if current_user.role not in (Role.ENGINEER, Role.ADMIN):
+        raise HTTPException(status_code=403)
+    old = form.status
+    form.status     = PCNFormStatus.ECN_PENDING_QC
+    form.reject_to  = None
+    form.updated_at = datetime.utcnow()
+    db.add(form)
+    db.add(PCNApproval(
+        form_id_fk=form.id, approver_id=current_user.id, action="ENG_RESUBMIT",
+        comment=comment or None, from_status=old.value,
+        to_status=PCNFormStatus.ECN_PENDING_QC.value,
+    ))
+    await db.commit()
+    return RedirectResponse(url=f"/pcn-forms/{form_id}", status_code=303)
+
+
 # ── PCN 品保上傳 ─────────────────────────────────
 
 @router.post("/{form_id}/upload-qc")

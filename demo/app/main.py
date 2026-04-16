@@ -19,9 +19,9 @@ async def seed_users():
     USERS = [
         {"username": "admin",      "display_name": "系統管理員",  "role": Role.ADMIN,     "bu": None},
         {"username": "eng01",      "display_name": "王工程師",    "role": Role.ENGINEER,  "bu": BU.ENERGY},
-        {"username": "qc01",       "display_name": "李品保",      "role": Role.QC,        "bu": None},
-        {"username": "prodmgr01",  "display_name": "張產線主管",  "role": Role.PROD_MGR,  "bu": None},
-        {"username": "buhead",     "display_name": "陳BU主管",    "role": Role.BU,        "bu": BU.ENERGY},
+        {"username": "qa01",       "display_name": "李品保",      "role": Role.QC,        "bu": None},
+        {"username": "pd01",       "display_name": "張產線主管",  "role": Role.PROD_MGR,  "bu": None},
+        {"username": "bh01",       "display_name": "陳BU主管",    "role": Role.BU,        "bu": BU.ENERGY},
         {"username": "engmgr",     "display_name": "林工程主管",  "role": Role.ENG_MGR,   "bu": None},
         {"username": "pc01",       "display_name": "黃採購",      "role": Role.PURCHASE,  "bu": None},
         {"username": "wh01",       "display_name": "趙倉管",      "role": Role.WAREHOUSE, "bu": None},
@@ -56,6 +56,10 @@ async def run_migrations():
         "UPDATE users SET username='pc01' WHERE username='purchase01'",
         # PCNForm 退回對象欄位（供列表過濾）
         "ALTER TABLE pcn_forms ADD COLUMN reject_to VARCHAR(50)",
+        # 帳號更名
+        "UPDATE users SET username='qa01' WHERE username='qc01'",
+        "UPDATE users SET username='pd01' WHERE username='prodmgr01'",
+        "UPDATE users SET username='bh01' WHERE username='buhead'",
     ]
     async with engine.begin() as conn:
         for sql in migrations:

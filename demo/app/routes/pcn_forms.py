@@ -20,7 +20,7 @@ templates = Jinja2Templates(directory="app/templates")
 UPLOAD_BASE = "uploads"
 
 # 提出部門選項
-DEPARTMENTS = ["業務部", "工程部", "資材部", "製造部"]
+DEPARTMENTS = ["業務部", "工程部", "資材部", "生產部", "品保部"]
 
 # PCN 只限工程師/管理員；ECN 所有已登入使用者皆可建立
 PCN_ALLOWED_ROLES = (Role.ENGINEER, Role.ADMIN)

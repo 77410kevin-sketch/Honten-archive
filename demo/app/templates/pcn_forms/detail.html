@@ -131,7 +131,7 @@
         </div>
         <div class="card-body">
           <div class="row g-2 mb-3">
-            <div class="col-sm-4"><span class="text-muted small">{% if form.type.value == 'PCN' %}提出人{% else %}提出部門{% endif %}</span><div class="fw-semibold">{{ form.department or '—' }}</div></div>
+            <div class="col-sm-4"><span class="text-muted small">{% if form.type.value == 'PCN' %}提出人{% else %}提案部門{% endif %}</span><div class="fw-semibold">{{ form.department or '—' }}</div></div>
             <div class="col-sm-4"><span class="text-muted small">廠內產品料號</span><div class="fw-semibold">{% for pn in form.product_name.split('\n') %}{% if pn.strip() %}<span class="badge bg-secondary me-1 mb-1">{{ pn.strip() }}</span>{% endif %}{% endfor %}</div></div>
             <div class="col-sm-4"><span class="text-muted small">機種名稱</span><div>{{ form.product_model or '—' }}</div></div>
           </div>

@@ -33,9 +33,13 @@
             {% endif %}
           </div>
           <div class="col-md-4">
-            <label class="form-label fw-semibold">提出人 <span class="text-danger">*</span></label>
-            <input type="text" name="department" class="form-control"
-                   placeholder="填寫提出人姓名" required>
+            <label class="form-label fw-semibold">提案部門 <span class="text-danger">*</span></label>
+            <select name="department" class="form-select" required>
+              <option value="">— 請選擇 —</option>
+              {% for dept in DEPARTMENTS %}
+              <option value="{{ dept }}">{{ dept }}</option>
+              {% endfor %}
+            </select>
           </div>
           <div class="col-md-4">
             <label class="form-label fw-semibold">提案日期</label>

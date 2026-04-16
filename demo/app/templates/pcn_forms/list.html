@@ -34,7 +34,6 @@
               <th>單號</th>
               <th>類型</th>
               <th>產品名稱</th>
-              <th>型號</th>
               <th>提出部門</th>
               <th>狀態</th>
               <th>建單者</th>
@@ -48,13 +47,17 @@
               <td><a href="/pcn-forms/{{ f.form_id }}" class="fw-semibold">{{ f.form_id }}</a></td>
               <td>
                 {% if f.type.value == 'PCN' %}
-                  <span class="badge bg-primary-subtle text-primary border border-primary-subtle">PCN</span>
+                  <span class="badge bg-primary-subtle text-primary border border-primary-subtle">新產品導入</span>
                 {% else %}
-                  <span class="badge bg-warning-subtle text-warning border border-warning-subtle">ECN</span>
+                  {% if f.change_types and f.change_types != '[]' %}
+                    {% set cts = f.change_types[1:-1] | replace('"', '') %}
+                    <span class="badge bg-warning-subtle text-warning border border-warning-subtle">ECN {{ cts }}</span>
+                  {% else %}
+                    <span class="badge bg-warning-subtle text-warning border border-warning-subtle">ECN</span>
+                  {% endif %}
                 {% endif %}
               </td>
               <td>{{ f.product_name }}</td>
-              <td class="text-muted small">{{ f.product_model or '—' }}</td>
               <td><span class="badge bg-light text-dark border">{{ f.department or '—' }}</span></td>
               <td>
                 {% if f.status.value == 'DRAFT' %}
@@ -87,7 +90,7 @@
             </tr>
             {% else %}
             <tr>
-              <td colspan="8" class="text-center text-muted py-4">
+              <td colspan="7" class="text-center text-muted py-4">
                 <i class="bi bi-inbox fs-4 d-block mb-1"></i>目前沒有符合條件的 PCN/ECN 單
               </td>
             </tr>

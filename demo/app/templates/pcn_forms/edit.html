@@ -25,6 +25,32 @@
     <div class="card-body">
       <form method="post" action="/pcn-forms/{{ form.form_id }}/edit" enctype="multipart/form-data">
 
+        {# ── 角色判斷（限縮模式） ── #}
+        {% set is_qc_edit   = (user.role.value == 'qc'        and form.status.value == 'RETURNED' and form.reject_to == '品保') %}
+        {% set is_prod_edit = (user.role.value == 'prod_mgr'  and form.status.value == 'RETURNED' and form.reject_to == '產線主管') %}
+        {% set is_wh_edit   = (user.role.value == 'warehouse' and form.status.value == 'RETURNED' and form.reject_to == '倉管') %}
+        {% set is_restricted = is_qc_edit or is_prod_edit or is_wh_edit %}
+
+        {% if is_restricted %}
+        {# ── 限縮模式：只顯示表單摘要 + 對應補件區 ── #}
+        <div class="alert alert-light border mb-3 px-3 py-2">
+          <div class="d-flex flex-wrap gap-4 small">
+            <div><span class="text-muted">表單</span><br><strong>{{ form.form_id }}</strong></div>
+            <div><span class="text-muted">料號</span><br><strong>{{ form.product_name | replace('\n', ' / ') }}</strong></div>
+            <div><span class="text-muted">部門</span><br><strong>{{ form.department or '—' }}</strong></div>
+            {% if is_qc_edit   %}<div><span class="badge bg-info">品保補件模式</span></div>
+            {% elif is_prod_edit %}<div><span class="badge bg-info text-dark">產線主管補件模式</span></div>
+            {% elif is_wh_edit %}<div><span class="badge bg-warning text-dark">倉管補件模式</span></div>{% endif %}
+          </div>
+        </div>
+        {# 傳遞既有欄位避免後端驗證失敗 #}
+        <input type="hidden" name="department"         value="{{ form.department or '' }}">
+        <input type="hidden" name="product_name"       value="{{ form.product_name }}">
+        <input type="hidden" name="change_description" value="{{ form.change_description }}">
+
+        {% else %}
+        {# ── 完整編輯模式 ── #}
+
         {# ── 基本資訊 ── #}
         <h6 class="fw-bold text-secondary border-bottom pb-1 mb-3">基本資訊</h6>
         <div class="row g-3 mb-3">
@@ -81,13 +107,18 @@
         </div>
 
         <div class="mb-3">
-          <label class="form-label fw-semibold">變更說明 <span class="text-danger">*</span></label>
+          <label class="form-label fw-semibold">
+            {% if form.type.value == 'PCN' %}製程說明與參數定義{% else %}變更說明{% endif %}
+            <span class="text-danger">*</span>
+          </label>
           <textarea name="change_description" class="form-control" rows="4" required>{{ form.change_description }}</textarea>
         </div>
 
         <div class="mb-3">
-          <label class="form-label fw-semibold">變更原因</label>
-          <textarea name="change_reason" class="form-control" rows="2">{{ form.change_reason or '' }}</textarea>
+          <label class="form-label fw-semibold">
+            {% if form.type.value == 'PCN' %}各製程包裝說明 <span class="text-danger">*</span>{% else %}變更原因{% endif %}
+          </label>
+          <textarea name="change_reason" class="form-control" rows="{% if form.type.value == 'PCN' %}3{% else %}2{% endif %}">{{ form.change_reason or '' }}</textarea>
         </div>
 
         {# ── ECN 變更類型（僅 ECN 表單顯示）── #}
@@ -137,7 +168,9 @@
         </div>
         {% endif %}
 
-        {# ── 已上傳附件 ── #}
+        {% endif %}{# end {% if not is_restricted %} #}
+
+        {# ── 已上傳附件（所有角色皆顯示）── #}
         {% if form.documents %}
         <h6 class="fw-bold text-secondary border-bottom pb-1 mb-3">已上傳附件</h6>
 
@@ -172,6 +205,45 @@
 
         {# ── 補充上傳附件 ── #}
         <h6 class="fw-bold text-secondary border-bottom pb-1 mb-3">補充上傳附件</h6>
+
+        {% if is_qc_edit %}
+        {# 品保：只補 SIP 檢表 #}
+        <div class="mb-3 p-3 border rounded" style="background:#f0f8ff;border-color:#0dcaf0!important">
+          <label class="form-label fw-semibold">
+            <i class="bi bi-clipboard-check me-1 text-info"></i>補充 SIP 檢表
+          </label>
+          <div class="d-flex gap-2 mb-2">
+            <input type="file" name="attach_files" class="form-control" accept="image/*,application/pdf,.xlsx,.xls">
+            <input type="hidden" name="attach_categories" value="SIP檢表">
+          </div>
+        </div>
+
+        {% elif is_prod_edit %}
+        {# 產線主管：只補 作業SOP #}
+        <div class="mb-3 p-3 border rounded" style="background:#f0fff4;border-color:#198754!important">
+          <label class="form-label fw-semibold">
+            <i class="bi bi-file-earmark-text me-1 text-success"></i>補充作業 SOP
+          </label>
+          <div class="d-flex gap-2 mb-2">
+            <input type="file" name="attach_files" class="form-control" accept="image/*,application/pdf,.xlsx,.xls,.doc,.docx">
+            <input type="hidden" name="attach_categories" value="作業SOP">
+          </div>
+        </div>
+
+        {% elif is_wh_edit %}
+        {# 倉管：只補 包裝SOP #}
+        <div class="mb-3 p-3 border rounded" style="background:#fff8e6;border-color:#fd7e14!important">
+          <label class="form-label fw-semibold">
+            <i class="bi bi-box-seam me-1 text-warning"></i>補充包裝 SOP
+          </label>
+          <div class="d-flex gap-2 mb-2">
+            <input type="file" name="attach_files" class="form-control" accept="image/*,application/pdf,.xlsx,.xls,.doc,.docx">
+            <input type="hidden" name="attach_categories" value="包裝SOP">
+          </div>
+        </div>
+
+        {% else %}
+        {# 工程師/建立者：完整上傳區 #}
 
         {# 圖面 / 報價單 #}
         <div class="mb-3 p-3 border rounded" style="background:#f8f9ff;border-color:#86b7fe!important">
@@ -216,7 +288,9 @@
         </div>
         {% endif %}
 
-        {# 其它附件 #}
+        {% endif %}{# end is_qc_edit / is_prod_edit / is_wh_edit / else #}
+
+        {# 其它附件（所有角色皆可） #}
         <div class="mb-4 p-3 border rounded bg-light">
           <label class="form-label fw-semibold"><i class="bi bi-paperclip me-1 text-secondary"></i>其它附件</label>
           <div id="other-zone">
@@ -433,16 +507,19 @@ function addOtherRow() {
 }
 
 // ── 表單送出攔截 ─────────────────────────────────
+const IS_RESTRICTED = {{ 'true' if is_restricted else 'false' }};
 document.querySelector('form[action*="/edit"]').addEventListener('submit', function(e) {
-  // 收集料號
-  const partInputs = document.querySelectorAll('#part-number-zone .part-number-input');
-  const partValues = [...partInputs].map(i => i.value.trim()).filter(Boolean);
-  if (partValues.length === 0) {
-    showAlert('請輸入至少一筆廠內產品料號');
-    e.preventDefault();
-    return;
+  // 限縮模式不需驗證料號（已有 hidden input）
+  if (!IS_RESTRICTED) {
+    const partInputs = document.querySelectorAll('#part-number-zone .part-number-input');
+    const partValues = [...partInputs].map(i => i.value.trim()).filter(Boolean);
+    if (partValues.length === 0) {
+      showAlert('請輸入至少一筆廠內產品料號');
+      e.preventDefault();
+      return;
+    }
+    document.getElementById('productNameHidden').value = partValues.join('\n');
   }
-  document.getElementById('productNameHidden').value = partValues.join('\n');
 
   // 注入圖面貼上的圖片
   const validDraw = drawPastedFiles.filter(Boolean);

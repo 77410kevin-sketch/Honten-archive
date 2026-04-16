@@ -359,10 +359,10 @@ async def update_pcn_form(
     form_id: str,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    department:         str = Form(...),
-    product_name:       str = Form(...),
+    department:         str = Form(""),
+    product_name:       str = Form(""),
     product_model:      str = Form(""),
-    change_description: str = Form(...),
+    change_description: str = Form(""),
     change_reason:      str = Form(""),
     effective_date:     str = Form(""),
     change_types:       str = Form(""),
@@ -380,15 +380,17 @@ async def update_pcn_form(
     if not is_creator and not is_qc_ret and not is_prod_ret and not is_wh_ret:
         raise HTTPException(status_code=403)
 
-    form.department         = department
-    form.product_name       = product_name
-    form.product_model      = product_model or None
-    form.change_description = change_description
-    form.change_reason      = change_reason or None
-    form.effective_date     = effective_date or None
-    form.updated_at         = datetime.utcnow()
-    if form.type == PCNType.ECN:
-        form.change_types = change_types or None
+    # 限縮角色只能上傳附件，不修改主表單欄位
+    if is_creator:
+        if department:         form.department         = department
+        if product_name:       form.product_name       = product_name
+        form.product_model      = product_model or None
+        if change_description: form.change_description = change_description
+        form.change_reason      = change_reason or None
+        form.effective_date     = effective_date or None
+        if form.type == PCNType.ECN:
+            form.change_types = change_types or None
+    form.updated_at = datetime.utcnow()
 
     await _save_attachments(db, form.id, current_user.id, attach_files, attach_categories)
     db.add(form)

@@ -387,7 +387,8 @@ function editPreviewDoc(docId, filename, ext) {
   } else if (ext === 'pdf') {
     body.innerHTML = `<iframe src="${url}" style="width:100%;height:80vh;border:none"></iframe>`;
   }
-  bootstrap.Modal.getOrCreate(document.getElementById('editPreviewModal')).show();
+  const modalEl = document.getElementById('editPreviewModal');
+  (bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl)).show();
 }
 
 // ── 刪除附件（fetch，避免巢狀 form 破壞主表單結構）──

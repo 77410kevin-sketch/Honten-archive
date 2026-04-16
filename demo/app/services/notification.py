@@ -34,11 +34,11 @@ async def notify_pcn_rejected(db, form, reject_target: str = "提案單位"):
 # ── ECN 核准 CC 通知 ─────────────────────────────
 
 async def notify_ecn_approved_tech(db, form):
-    """ECN 技術類（製程/設計/供應商）核准 → CC：工程 + 品保 + 提出單位"""
-    logger.info(f"[LINE通知-Demo] ECN技術類核准 | {form.form_id} | CC→工程、品保、提出單位")
+    """ECN 技術類（製程/設計/供應商）核准 → CC：工程 + 品保 + 資材 + 提出單位"""
+    logger.info(f"[LINE通知-Demo] ECN技術類核准 | {form.form_id} | CC→工程、品保、資材、提出單位")
     print(
         f"\n📱 [LINE通知-CC] 【✅ ECN技術類核准】{form.form_id} - {form.product_name}\n"
-        f"   CC 通知：工程部門、品保部門、提出單位（{form.department or '—'}）\n"
+        f"   CC 通知：工程部門、品保部門、資材部門（採購/倉管）、提出單位（{form.department or '—'}）\n"
     )
 
 

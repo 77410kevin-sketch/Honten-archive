@@ -273,25 +273,33 @@
                     <th style="background:#cfe2ff">舊料庫存量 <span class="text-danger">*</span><br><small class="fw-normal text-primary">倉管填寫</small></th>
                     <th style="background:#f8f9fa">處理方式</th>
                     <th style="background:#f8f9fa">備註</th>
+                    <th class="bg-light text-center" style="width:36px"></th>
                   </tr>
                 </thead>
                 <tbody id="whInvBody">
                   {% for row in inventory_rows %}
-                  <tr>
-                    <td class="text-center text-muted bg-light">{{ loop.index }}</td>
-                    <td style="background:#f0fff4">{{ row.old_pn or '—' }}</td>
+                  <tr data-pn="{{ row.old_pn or '' }}">
+                    <td class="text-center text-muted bg-light wh-row-num">{{ loop.index }}</td>
+                    <td style="background:#f0fff4" class="fw-semibold">{{ row.old_pn or '—' }}</td>
                     <td style="background:#f0f8ff">
                       <input type="text" class="form-control form-control-sm wh-station"
-                             data-idx="{{ loop.index0 }}" value="{{ row.station or '' }}"
+                             value="{{ row.station or '' }}"
                              placeholder="例：SMT / 倉庫">
                     </td>
                     <td style="background:#f0f8ff">
                       <input type="number" class="form-control form-control-sm wh-qty"
-                             data-idx="{{ loop.index0 }}" value="{{ row.qty or '' }}"
+                             value="{{ row.qty or '' }}"
                              placeholder="0" min="0">
                     </td>
                     <td class="text-muted small" style="background:#f8f9fa">{{ row.action or '— 待工程判定 —' }}</td>
                     <td class="text-muted small" style="background:#f8f9fa">{{ row.remark or '' }}</td>
+                    <td class="text-center bg-light">
+                      <button type="button" class="btn btn-sm btn-outline-success py-0 px-1"
+                              title="新增此料號的站別"
+                              onclick="addWhStationRow('{{ row.old_pn or '' }}')">
+                        <i class="bi bi-plus"></i>
+                      </button>
+                    </td>
                   </tr>
                   {% endfor %}
                 </tbody>
@@ -646,10 +654,10 @@
           {# 工程師退回後重新送審 #}
           {% if form.status.value == 'RETURNED' and form.reject_to == '工程師' and user.role.value in ('engineer', 'admin') %}
           <form method="post" action="/pcn-forms/{{ form.form_id }}/eng-resubmit"
-                onsubmit="return confirm('確認重新送交品保確認？')">
+                onsubmit="return confirm('確認重新送交 BU Head 審核？')">
             <input type="hidden" name="comment" value="">
             <button type="submit" class="btn btn-primary w-100">
-              <i class="bi bi-send me-1"></i>重新送品保確認
+              <i class="bi bi-send me-1"></i>重新送 BU 審核
             </button>
           </form>
           {% endif %}
@@ -806,7 +814,7 @@
               <div class="fw-semibold mb-2"><i class="bi bi-megaphone me-1"></i>核准後 LINE 推播 CC：</div>
               <ul class="mb-0 ps-3">
                 {% if ecn_tech_review %}
-                <li>技術類 → <strong>工程部門、品保部門、提出單位</strong></li>
+                <li>技術類 → <strong>工程部門、品保部門、資材部門、提出單位</strong></li>
                 {% endif %}
                 {% if '售價變更' in change_types_list %}
                 <li>售價變更 → <strong>提出單位、業務助理、人事</strong></li>
@@ -898,17 +906,53 @@
 function collectWhInventory() {
   const rows = document.querySelectorAll('#whInvBody tr');
   if (!rows.length) return;
-  const original = {{ inventory_rows | tojson }};
-  rows.forEach((tr, i) => {
+  const data = [];
+  rows.forEach(tr => {
+    const pn      = tr.dataset.pn || '';
     const station = tr.querySelector('.wh-station');
     const qty     = tr.querySelector('.wh-qty');
-    if (original[i] !== undefined) {
-      if (station) original[i].station = station.value.trim();
-      if (qty)     original[i].qty     = qty.value.trim();
-    }
+    data.push({
+      old_pn:  pn,
+      station: station ? station.value.trim() : '',
+      qty:     qty     ? qty.value.trim()     : '',
+      action:  '',
+      remark:  '',
+    });
   });
   const hidden = document.getElementById('whInvDataHidden');
-  if (hidden) hidden.value = JSON.stringify(original);
+  if (hidden) hidden.value = JSON.stringify(data);
+}
+
+function addWhStationRow(pn) {
+  const tbody = document.getElementById('whInvBody');
+  const tr = document.createElement('tr');
+  tr.dataset.pn = pn;
+  tr.innerHTML = `
+    <td class="text-center text-muted bg-light wh-row-num">${tbody.querySelectorAll('tr').length + 1}</td>
+    <td style="background:#f0fff4" class="fw-semibold text-muted">${pn || '—'}</td>
+    <td style="background:#f0f8ff">
+      <input type="text" class="form-control form-control-sm wh-station" placeholder="例：SMT / 倉庫">
+    </td>
+    <td style="background:#f0f8ff">
+      <input type="number" class="form-control form-control-sm wh-qty" placeholder="0" min="0">
+    </td>
+    <td class="text-muted small" style="background:#f8f9fa">— 待工程判定 —</td>
+    <td class="text-muted small" style="background:#f8f9fa"></td>
+    <td class="text-center bg-light">
+      <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1"
+              title="移除此行" onclick="removeWhRow(this)">
+        <i class="bi bi-dash"></i>
+      </button>
+    </td>`;
+  tbody.appendChild(tr);
+  // 更新行號
+  tbody.querySelectorAll('.wh-row-num').forEach((el, i) => el.textContent = i + 1);
+}
+
+function removeWhRow(btn) {
+  const tbody = document.getElementById('whInvBody');
+  btn.closest('tr').remove();
+  tbody.querySelectorAll('.wh-row-num').forEach((el, i) => el.textContent = i + 1);
 }
 
 // ── 工程：收集處理方式與備註 ──────────────────────

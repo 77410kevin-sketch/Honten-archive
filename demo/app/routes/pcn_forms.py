@@ -417,19 +417,24 @@ async def submit_pcn_form(
 
     old = form.status
 
-    # 依表單類型與變更類型決定下一站
-    change_types = set(_parse_change_types(form.change_types))
-    if form.type == PCNType.ECN:
-        if _ecn_needs_tech_review(form):
-            # 設計變更且有庫存盤點資料 → 先走倉管
-            if "設計變更" in change_types and form.inventory_data:
-                next_status = PCNFormStatus.ECN_PENDING_WAREHOUSE
-            else:
-                next_status = PCNFormStatus.ECN_PENDING_ENG
-        else:
-            next_status = PCNFormStatus.PENDING_BU_APPROVAL  # 商業類 → 直接 BU
+    # BU 退回後重新送審 → 直接回 BU，不重走工程/品保流程
+    if form.reject_to:
+        next_status = PCNFormStatus.PENDING_BU_APPROVAL
+        form.reject_to = None
     else:
-        next_status = PCNFormStatus.PENDING_QC  # PCN → 品保 SIP
+        # 依表單類型與變更類型決定下一站
+        change_types = set(_parse_change_types(form.change_types))
+        if form.type == PCNType.ECN:
+            if _ecn_needs_tech_review(form):
+                # 設計變更且有庫存盤點資料 → 先走倉管
+                if "設計變更" in change_types and form.inventory_data:
+                    next_status = PCNFormStatus.ECN_PENDING_WAREHOUSE
+                else:
+                    next_status = PCNFormStatus.ECN_PENDING_ENG
+            else:
+                next_status = PCNFormStatus.PENDING_BU_APPROVAL  # 商業類 → 直接 BU
+        else:
+            next_status = PCNFormStatus.PENDING_QC  # PCN → 品保 SIP
 
     form.status     = next_status
     form.updated_at = datetime.utcnow()
@@ -583,14 +588,14 @@ async def eng_resubmit(
     if current_user.role not in (Role.ENGINEER, Role.ADMIN):
         raise HTTPException(status_code=403)
     old = form.status
-    form.status     = PCNFormStatus.ECN_PENDING_QC
+    form.status     = PCNFormStatus.PENDING_BU_APPROVAL
     form.reject_to  = None
     form.updated_at = datetime.utcnow()
     db.add(form)
     db.add(PCNApproval(
         form_id_fk=form.id, approver_id=current_user.id, action="ENG_RESUBMIT",
         comment=comment or None, from_status=old.value,
-        to_status=PCNFormStatus.ECN_PENDING_QC.value,
+        to_status=PCNFormStatus.PENDING_BU_APPROVAL.value,
     ))
     await db.commit()
     return RedirectResponse(url=f"/pcn-forms/{form_id}", status_code=303)

@@ -389,6 +389,27 @@
               <i class="bi bi-check-lg me-1"></i>工程確認完成，送品保
             </button>
           </form>
+          <hr class="my-3">
+          {# 工程確認附件上傳 #}
+          <div class="fw-semibold small mb-2"><i class="bi bi-paperclip me-1 text-primary"></i>上傳變更附件（選填）</div>
+          <form method="post" action="/pcn-forms/{{ form.form_id }}/ecn-upload-eng" enctype="multipart/form-data">
+            <div class="row g-2 align-items-end">
+              <div class="col-md-4">
+                <select name="attach_categories" class="form-select form-select-sm">
+                  <option value="BOM/途程截圖">BOM／途程截圖</option>
+                  <option value="料號圖面">料號圖面</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <input type="file" name="attach_files" class="form-control form-control-sm">
+              </div>
+              <div class="col-md-2">
+                <button type="submit" class="btn btn-sm btn-outline-primary w-100">
+                  <i class="bi bi-upload"></i> 上傳
+                </button>
+              </div>
+            </div>
+          </form>
         </div>
       </div>
       {% endif %}
@@ -447,6 +468,27 @@
             </div>
           </div>
           {% endif %}
+          {# 品保確認附件上傳 #}
+          <div class="fw-semibold small mb-2"><i class="bi bi-paperclip me-1" style="color:#6f42c1"></i>上傳變更附件（選填）</div>
+          <form method="post" action="/pcn-forms/{{ form.form_id }}/ecn-upload-qc" enctype="multipart/form-data" class="mb-3">
+            <div class="row g-2 align-items-end">
+              <div class="col-md-4">
+                <select name="attach_categories" class="form-select form-select-sm">
+                  <option value="變更後SIP">變更後 SIP</option>
+                  <option value="變更後檢表">變更後檢表</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <input type="file" name="attach_files" class="form-control form-control-sm">
+              </div>
+              <div class="col-md-2">
+                <button type="submit" class="btn btn-sm btn-outline-primary w-100">
+                  <i class="bi bi-upload"></i> 上傳
+                </button>
+              </div>
+            </div>
+          </form>
+          <hr class="my-3">
           <form method="post" action="/pcn-forms/{{ form.form_id }}/ecn-qc-confirm">
             <div class="mb-3">
               <label class="form-label fw-semibold">品保確認意見 <span class="text-muted fw-normal">(選填)</span></label>
@@ -803,8 +845,8 @@
           <i class="bi bi-paperclip me-2 text-secondary"></i>附件
         </div>
         <div class="card-body">
-          {% set categories_order = ['圖面/報價單', '料號BOM途程', 'SIP檢表', '作業SOP', '包裝SOP', '其它'] %}
-          {% set cat_icons = {'圖面/報價單': 'bi-file-earmark-image text-primary', '料號BOM途程': 'bi-grid-3x3 text-warning', 'SIP檢表': 'bi-clipboard2-check text-success', '作業SOP': 'bi-tools text-warning', '包裝SOP': 'bi-box-seam text-info', '其它': 'bi-paperclip text-secondary'} %}
+          {% set categories_order = ['圖面/報價單', '料號BOM途程', 'BOM/途程截圖', '料號圖面', 'SIP檢表', '變更後SIP', '變更後檢表', '作業SOP', '包裝SOP', '其它'] %}
+          {% set cat_icons = {'圖面/報價單': 'bi-file-earmark-image text-primary', '料號BOM途程': 'bi-grid-3x3 text-warning', 'BOM/途程截圖': 'bi-grid-3x3 text-primary', '料號圖面': 'bi-file-earmark-image text-info', 'SIP檢表': 'bi-clipboard2-check text-success', '變更後SIP': 'bi-clipboard2-check text-success', '變更後檢表': 'bi-clipboard2-check text-success', '作業SOP': 'bi-tools text-warning', '包裝SOP': 'bi-box-seam text-info', '其它': 'bi-paperclip text-secondary'} %}
 
           {% set has_any = false %}
           {% for cat in categories_order %}
@@ -921,24 +963,22 @@
               <span class="badge bg-success">BU 審核</span>
             </div>
           </div>
-          {# 必要附件檢核 #}
+          {# 附件狀態提示（僅供參考，不強制） #}
           {% set has_drawing = '圖面/報價單' in docs_by_cat %}
           {% set has_bom = '料號BOM途程' in docs_by_cat %}
-          {% if not has_drawing or not has_bom %}
-          <div class="rounded-3 p-3 mb-3" style="background:#fff3cd;border:1.5px solid #ffc107">
-            <div class="fw-semibold mb-2" style="color:#856404"><i class="bi bi-exclamation-triangle-fill me-1"></i>送審前必要附件</div>
+          <div class="rounded-3 p-3 mb-3" style="background:#f8f9fa;border:1px solid #dee2e6">
+            <div class="fw-semibold mb-2 small text-muted"><i class="bi bi-paperclip me-1"></i>附件狀態（選填，可先送審再補件）</div>
             <div class="small">
               <div class="d-flex align-items-center gap-2 mb-1">
-                <i class="bi bi-{{ 'check-circle-fill text-success' if has_drawing else 'x-circle-fill text-danger' }}"></i>
-                <span class="{{ 'text-success' if has_drawing else 'text-danger fw-semibold' }}">圖面／報價單 {{ '' if has_drawing else '— 尚未上傳！' }}</span>
+                <i class="bi bi-{{ 'check-circle-fill text-success' if has_drawing else 'dash-circle text-muted' }}"></i>
+                <span class="{{ 'text-success' if has_drawing else 'text-muted' }}">圖面／報價單</span>
               </div>
               <div class="d-flex align-items-center gap-2">
-                <i class="bi bi-{{ 'check-circle-fill text-success' if has_bom else 'x-circle-fill text-danger' }}"></i>
-                <span class="{{ 'text-success' if has_bom else 'text-danger fw-semibold' }}">料號 BOM 途程 {{ '' if has_bom else '— 尚未上傳！' }}</span>
+                <i class="bi bi-{{ 'check-circle-fill text-success' if has_bom else 'dash-circle text-muted' }}"></i>
+                <span class="{{ 'text-success' if has_bom else 'text-muted' }}">料號 BOM 途程</span>
               </div>
             </div>
           </div>
-          {% endif %}
           {% endif %}
           <label class="form-label fw-semibold">備註（選填）</label>
           <textarea name="comment" class="form-control" rows="3" placeholder="補充說明..."></textarea>

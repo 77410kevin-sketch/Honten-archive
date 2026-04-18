@@ -468,8 +468,6 @@ async def submit_pcn_form(
         raise HTTPException(status_code=400, detail="目前狀態無法送審")
     if current_user.role != Role.ADMIN and form.created_by != current_user.id:
         raise HTTPException(status_code=403)
-    if not form.documents:
-        raise HTTPException(status_code=400, detail="送審前請先上傳附件")
 
     old = form.status
 
@@ -672,6 +670,46 @@ async def upload_qc_doc(
     form = await _get_form_or_404(form_id, db)
     if form.status != PCNFormStatus.PENDING_QC:
         raise HTTPException(status_code=403)
+    if current_user.role not in (Role.QC, Role.ADMIN):
+        raise HTTPException(status_code=403)
+    await _save_attachments(db, form.id, current_user.id, attach_files, attach_categories)
+    await db.commit()
+    return RedirectResponse(url=f"/pcn-forms/{form_id}", status_code=303)
+
+
+# ── ECN 工程確認階段上傳附件 ──────────────────────
+
+@router.post("/{form_id}/ecn-upload-eng")
+async def ecn_upload_eng_doc(
+    form_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    attach_files: List[UploadFile] = File(default=[]),
+    attach_categories: List[str] = Form(default=[]),
+):
+    form = await _get_form_or_404(form_id, db)
+    if form.status != PCNFormStatus.ECN_PENDING_ENG:
+        raise HTTPException(status_code=403, detail="目前狀態不允許上傳附件")
+    if current_user.role not in (Role.ENGINEER, Role.ADMIN):
+        raise HTTPException(status_code=403)
+    await _save_attachments(db, form.id, current_user.id, attach_files, attach_categories)
+    await db.commit()
+    return RedirectResponse(url=f"/pcn-forms/{form_id}", status_code=303)
+
+
+# ── ECN 品保確認階段上傳附件 ──────────────────────
+
+@router.post("/{form_id}/ecn-upload-qc")
+async def ecn_upload_qc_doc(
+    form_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    attach_files: List[UploadFile] = File(default=[]),
+    attach_categories: List[str] = Form(default=[]),
+):
+    form = await _get_form_or_404(form_id, db)
+    if form.status != PCNFormStatus.ECN_PENDING_QC:
+        raise HTTPException(status_code=403, detail="目前狀態不允許上傳附件")
     if current_user.role not in (Role.QC, Role.ADMIN):
         raise HTTPException(status_code=403)
     await _save_attachments(db, form.id, current_user.id, attach_files, attach_categories)

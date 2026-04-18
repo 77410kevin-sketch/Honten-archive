@@ -36,10 +36,84 @@ def _send_line_push(target: str, message: str):
     print(f"\n📱 [LINE] {target}\n   {message}\n")
 
 
-def _send_mail(to_addr: str, subject: str, body: str, attachments: Iterable[str] = ()):
-    att = ", ".join(os.path.basename(a) for a in attachments) or "—"
-    logger.info(f"[MAIL] → {to_addr} | {subject} | att={att}")
-    print(f"\n📧 [MAIL] To: {to_addr}\n   Subject: {subject}\n   Attachments: {att}\n   Body: {body[:120]}...\n")
+def _send_mail(to_addr: str, subject: str, body: str, attachments: Iterable[str] = (),
+               cc: Iterable[str] = ()):
+    """寄送 mail。
+
+    - 若 .env 設定 `SMTP_HOST` → 實際透過 smtplib 寄出（含附件、CC）
+    - 否則退回 Demo 模式，print 到 console（維持開發測試不中斷）
+
+    所需環境變數：
+        SMTP_HOST, SMTP_PORT (default 587), SMTP_USER, SMTP_PASSWORD
+        SMTP_FROM (default = SMTP_USER)
+        SMTP_FROM_NAME (default 鴻騰電子 NPI 系統)
+        SMTP_SSL (true = 465 direct SSL；預設 false = 587 STARTTLS)
+        SMTP_REPLY_TO (optional)
+    """
+    att_names = ", ".join(os.path.basename(a) for a in attachments) or "—"
+    cc_list = [c for c in cc if c]
+
+    host = os.getenv("SMTP_HOST", "").strip()
+    if not host:
+        # Demo 模式：不寄，只 log
+        logger.info(f"[MAIL dry-run] → {to_addr} | {subject} | att={att_names}")
+        cc_str = (", ".join(cc_list)) if cc_list else "—"
+        print(f"\n📧 [MAIL dry-run] To: {to_addr}  CC: {cc_str}\n"
+              f"   Subject: {subject}\n   Attachments: {att_names}\n"
+              f"   Body: {body[:120]}...\n")
+        return
+
+    port = int(os.getenv("SMTP_PORT", "587"))
+    user = os.getenv("SMTP_USER", "").strip()
+    password = os.getenv("SMTP_PASSWORD", "")
+    from_addr = os.getenv("SMTP_FROM", user).strip()
+    from_name = os.getenv("SMTP_FROM_NAME", "鴻騰電子 NPI 系統").strip()
+    use_ssl = os.getenv("SMTP_SSL", "false").lower() in ("1", "true", "yes")
+    reply_to = os.getenv("SMTP_REPLY_TO", "").strip()
+
+    try:
+        import smtplib
+        import mimetypes
+        from email.message import EmailMessage
+        from email.utils import formataddr
+
+        msg = EmailMessage()
+        msg["From"] = formataddr((from_name, from_addr)) if from_name else from_addr
+        msg["To"] = to_addr
+        if cc_list:
+            msg["Cc"] = ", ".join(cc_list)
+        if reply_to:
+            msg["Reply-To"] = reply_to
+        msg["Subject"] = subject
+        msg.set_content(body)
+
+        for path in attachments:
+            if not path or not os.path.exists(path):
+                logger.warning(f"[MAIL] skip missing attachment: {path}")
+                continue
+            mime, _ = mimetypes.guess_type(path)
+            maintype, subtype = (mime or "application/octet-stream").split("/", 1)
+            with open(path, "rb") as f:
+                msg.add_attachment(f.read(), maintype=maintype, subtype=subtype,
+                                   filename=os.path.basename(path))
+
+        if use_ssl:
+            server = smtplib.SMTP_SSL(host, port, timeout=30)
+        else:
+            server = smtplib.SMTP(host, port, timeout=30)
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+        if user and password:
+            server.login(user, password)
+        recipients = [to_addr] + cc_list
+        server.send_message(msg, from_addr=from_addr, to_addrs=recipients)
+        server.quit()
+        logger.info(f"[MAIL sent] → {to_addr} (cc={len(cc_list)}) | {subject} | att={att_names}")
+    except Exception as e:
+        logger.error(f"[MAIL FAILED] to={to_addr} err={e}")
+        # 不 raise — 避免寄信失敗卡住整個流程；用 print 讓 demo 也能看到
+        print(f"\n❌ [MAIL FAILED] To: {to_addr} | {subject}\n   Error: {e}\n")
 
 
 async def _users_by_role(db: AsyncSession, role: Role) -> list[User]:
@@ -63,28 +137,59 @@ async def notify_sales_submitted(db: AsyncSession, form: NPIForm):
 
 
 async def notify_quotes_dispatched(db: AsyncSession, form: NPIForm, invites: list[NPISupplierInvite]):
-    """工程派發詢價：向每家供應商寄 mail（第一次）+ 通知業務"""
+    """工程派發詢價：向每家供應商寄 mail（第一次）+ 通知業務 / 工程主管"""
+    # CC 對象：業務（建單者） + 工程（指派者）— 讓他們留有寄件紀錄
+    cc_list = []
+    if form.creator and getattr(form.creator, "email", None):
+        cc_list.append(form.creator.email)
+    if form.assigned_eng and getattr(form.assigned_eng, "email", None):
+        cc_list.append(form.assigned_eng.email)
+
+    # 取共用欄位（材質 / MOQ）— 取第一筆有值的
+    shared_mat = next((i.material for i in invites if i.material), "—")
+    shared_qty = next((i.qty for i in invites if i.qty), "—")
+
     for inv in invites:
         sup: Supplier | None = inv.supplier
         if not sup or not sup.email:
             logger.warning(f"Supplier {inv.supplier_id} 沒有 email，略過")
             continue
-        subject = f"【鴻騰電子 RFQ 詢價】{form.form_id} - {form.product_name}"
+        drawing_label = ""
+        if inv.drawing:
+            drawing_label = f"\n對應圖面：{inv.drawing.original_name}"
+        subject = (f"【鴻騰電子 RFQ 詢價】{form.form_id} - "
+                   f"{form.product_name}{(' / ' + inv.process_name) if inv.process_name else ''}")
         body = (
-            f"您好 {sup.contact or ''}，\n"
-            f"請針對本案提供報價與交期。\n"
+            f"您好 {sup.contact or ''}，\n\n"
+            f"鴻騰電子委請 貴司針對下列案件提供報價與交期，詳細資訊如下：\n"
+            f"─────────────────────────────────\n"
+            f"詢價單號：{form.form_id}\n"
             f"客戶：{form.customer_name}\n"
             f"產品：{form.product_name} / 型號：{form.product_model or '—'}\n"
             f"規格摘要：{form.spec_summary or '—'}\n"
-            f"客戶回覆期限：{form.rfq_due_date or '—'}\n\n"
-            f"請於 2 個工作天內回覆，否則系統將自動發信跟催。"
+            f"製程：{inv.process_name or '—'}\n"
+            f"材質：{shared_mat}\n"
+            f"評估 MOQ：{shared_qty}"
+            f"{drawing_label}\n"
+            f"客戶回覆期限：{form.rfq_due_date or '—'}\n"
+            f"─────────────────────────────────\n\n"
+            f"請於 2 個工作天內回覆報價（金額、交期、備註），謝謝。\n"
+            f"若有任何疑問，請直接回信聯絡本案窗口。\n\n"
+            f"— 鴻騰電子 NPI 系統\n"
         )
-        # 附件：圖面
+        # 附件：該供應商對應的圖面（若綁特定圖），否則所有「圖面」類附件
         att_paths = []
-        for d in form.documents:
-            if d.category == "圖面":
-                att_paths.append(os.path.join(UPLOAD_BASE, f"npi_{form.id}", d.filename))
-        _send_mail(sup.email, subject, body, att_paths)
+        if inv.drawing:
+            src = os.path.join(UPLOAD_BASE, f"npi_{form.id}", inv.drawing.filename)
+            if os.path.exists(src):
+                att_paths.append(src)
+        else:
+            for d in form.documents:
+                if d.category == "圖面":
+                    p = os.path.join(UPLOAD_BASE, f"npi_{form.id}", d.filename)
+                    if os.path.exists(p):
+                        att_paths.append(p)
+        _send_mail(sup.email, subject, body, att_paths, cc=cc_list)
         inv.first_sent_at = datetime.utcnow()
     # 業務 + 工程主管
     await _notify_roles(
@@ -197,15 +302,20 @@ async def notify_npi_rejected(db: AsyncSession, form: NPIForm, target: str):
 
 
 async def notify_quote_approved(db: AsyncSession, form: NPIForm):
-    """BU 核准報價後：把成本分析 + 報價資訊落地 NAS 的 RFQ_Quote 資料夾。
+    """BU 核准報價後：把成本分析 + 客戶報價單 HTML 落地 NAS 的 RFQ_Quote 資料夾。
 
-    包含：
-    - quote_summary.json（quote_cost_data + 報價單價 + BU 評語）
-    - 成本分析類附件（category: 成本分析）
-    - 供應商報價類附件（category: 供應商報價）
+    存入：
+    - cost_analysis/quote_summary.json（內部：完整試算 + 利潤 + BU 評語）
+    - cost_analysis/*（成本分析類附件，內部用）
+    - supplier_quotes/*（供應商報價單，內部參考）
+    - customer_quote/{form_id}_報價單.html（對外版本，業務可直接寄給客戶）
+    - customer_quote/*（業務已上傳的客戶報價相關附件）
     """
+    import json as _json
     nas_dir = _ensure_nas_dir(form, "RFQ_Quote")
-    # 1. 寫出 quote_summary.json
+    # 1. 內部：成本分析 JSON（含利潤/供應商資訊）
+    internal_dir = os.path.join(nas_dir, "internal_cost_analysis")
+    os.makedirs(internal_dir, exist_ok=True)
     summary = {
         "form_id": form.form_id,
         "customer_name": form.customer_name,
@@ -218,29 +328,47 @@ async def notify_quote_approved(db: AsyncSession, form: NPIForm):
         "approved_at": datetime.utcnow().isoformat(),
     }
     try:
-        with open(os.path.join(nas_dir, "quote_summary.json"), "w", encoding="utf-8") as f:
-            import json as _json
+        with open(os.path.join(internal_dir, "quote_summary.json"), "w", encoding="utf-8") as f:
             _json.dump(summary, f, ensure_ascii=False, indent=2)
     except Exception as e:
         logger.warning(f"write quote_summary.json failed: {e}")
-    # 2. 複製成本分析 / 供應商報價附件
+    # 2. 附件分流：成本分析 → internal；供應商報價 → supplier_quotes；客戶報價 → customer_quote
+    cat_to_dir = {
+        "成本分析表": os.path.join(nas_dir, "internal_cost_analysis"),
+        "供應商報價": os.path.join(nas_dir, "supplier_quotes"),
+        "客戶報價單": os.path.join(nas_dir, "customer_quote"),
+    }
     for d in form.documents:
-        if (d.category or "") not in ("成本分析", "供應商報價", "客戶報價"):
+        sub = cat_to_dir.get(d.category or "")
+        if not sub:
             continue
+        os.makedirs(sub, exist_ok=True)
         src = os.path.join(UPLOAD_BASE, f"npi_{form.id}", d.filename)
         if not os.path.exists(src):
             continue
-        cat = (d.category or "其它").replace("/", "_")
-        sub = os.path.join(nas_dir, cat)
-        os.makedirs(sub, exist_ok=True)
         try:
             shutil.copy2(src, os.path.join(sub, d.original_name))
         except Exception as e:
-            logger.warning(f"copy to NAS (quote approved) failed: {e}")
-    # 3. 通知業務 + BU
+            logger.warning(f"copy to NAS failed: {e}")
+    # 3. 產出「對外客戶報價單」HTML 並落地
+    try:
+        from jinja2 import Environment, FileSystemLoader, select_autoescape
+        env = Environment(loader=FileSystemLoader("app/templates"),
+                          autoescape=select_autoescape(["html"]))
+        tmpl = env.get_template("npi_forms/customer_quote.html")
+        html = tmpl.render(form=form, quote_data=_safe_parse_json(form.quote_cost_data) or {},
+                           now=datetime.utcnow())
+        out_dir = os.path.join(nas_dir, "customer_quote")
+        os.makedirs(out_dir, exist_ok=True)
+        out_path = os.path.join(out_dir, f"{form.form_id}_客戶報價單.html")
+        with open(out_path, "w", encoding="utf-8") as f:
+            f.write(html)
+    except Exception as e:
+        logger.warning(f"render customer_quote.html to NAS failed: {e}")
+    # 4. 通知
     await _notify_roles(
         db, [Role.SALES, Role.BU],
-        f"【報價核准並歸檔】{form.form_id} - 成本分析與報價已存入 NAS：{nas_dir}",
+        f"【報價核准並歸檔】{form.form_id} - 成本分析（內部）與客戶報價單（對外）已存入 NAS：{nas_dir}",
     )
 
 

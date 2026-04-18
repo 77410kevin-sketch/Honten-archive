@@ -496,12 +496,18 @@ async def fill_invite_reply(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     quote_amount:   str  = Form(""),
+    tooling_cost:   str  = Form(""),
     lead_time_days: str  = Form(""),
     quote_comment:  str  = Form(""),
     attach_files:   List[UploadFile] = File(default=[]),
 ):
     form = await _get_form_or_404(form_id, db)
-    if form.status != NPIFormStatus.QUOTING:
+    # 允許狀態：QUOTING（首輪報價收集）；或 RETURNED 且退回對象=採購（議價調整）
+    allow = (
+        form.status == NPIFormStatus.QUOTING
+        or (form.status == NPIFormStatus.RETURNED and form.reject_to == "採購")
+    )
+    if not allow:
         raise HTTPException(status_code=400, detail="目前狀態非報價中")
     if current_user.role not in _RFQ_COLLECT_ROLES:
         raise HTTPException(status_code=403, detail="只有採購 / 工程可以回填報價")
@@ -509,6 +515,7 @@ async def fill_invite_reply(
     if not inv:
         raise HTTPException(status_code=404, detail="找不到派發紀錄")
     inv.quote_amount   = float(quote_amount) if quote_amount else None
+    inv.tooling_cost   = float(tooling_cost) if tooling_cost else None
     inv.lead_time_days = int(lead_time_days) if lead_time_days.isdigit() else None
     inv.quote_comment  = quote_comment or None
     inv.replied_at     = datetime.utcnow()
@@ -642,6 +649,34 @@ async def reject_quote_bu(
         f"【報價被 BU 退回】{form.form_id} - 請調整試算後重送。原因：{comment.strip()[:80]}",
     )
     return RedirectResponse(url=f"/npi-forms/{form_id}", status_code=303)
+
+
+# ── 客戶報價單（對外版本，不含成本/供應商資訊）──────────
+
+@router.get("/{form_id}/customer-quote", response_class=HTMLResponse)
+async def customer_quote_view(
+    form_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """產生對外的客戶報價單（乾淨版面、可列印 / 存 PDF）。
+    僅顯示：客戶資訊、機種、材質、數量、單價、交期、付款條件 — 不含成本分析、利潤率、供應商。
+    """
+    form = await _get_form_or_404(form_id, db)
+    if current_user.role not in (*_SALES_ROLES, *_BU_ROLES, Role.ADMIN):
+        raise HTTPException(status_code=403)
+    quote_data = {}
+    if form.quote_cost_data:
+        try:
+            quote_data = json.loads(form.quote_cost_data)
+        except Exception:
+            pass
+    return templates.TemplateResponse("npi_forms/customer_quote.html", {
+        "request": request, "user": current_user,
+        "form": form, "quote_data": quote_data,
+        "now": datetime.utcnow(),
+    })
 
 
 # ── 業務完成成本分析 → 發客戶報價 ──────────

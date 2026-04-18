@@ -147,13 +147,13 @@
         </div>
         <div class="card-body p-0">
           {% if form.invites %}
-          {# 整張單共用的材質 / 總需求量（取第一筆有值的 invite）#}
+          {# 整張單共用的材質 / 評估 MOQ（取第一筆有值的 invite）#}
           {% set mat_inv = (form.invites | selectattr('material') | first) %}
           {% set qty_inv = (form.invites | selectattr('qty') | first) %}
           {% if mat_inv or qty_inv %}
           <div class="px-3 pt-2 small text-muted d-flex flex-wrap gap-3 border-bottom pb-2">
             <span><strong class="text-dark">材質：</strong>{{ mat_inv.material if mat_inv else '—' }}</span>
-            <span><strong class="text-dark">總需求量：</strong>{{ qty_inv.qty if qty_inv else '—' }}</span>
+            <span><strong class="text-dark">評估 MOQ：</strong>{{ qty_inv.qty if qty_inv else '—' }}</span>
           </div>
           {% endif %}
           <table class="table mb-0 small align-middle">
@@ -167,6 +167,7 @@
                 <th>跟催</th>
                 <th>回覆時間</th>
                 <th>報價金額</th>
+                <th>模治具費</th>
                 <th>實際交期</th>
                 <th>備註</th>
                 <th>選用</th>
@@ -201,6 +202,7 @@
                 <td>{{ inv.reminder_count or 0 }}</td>
                 <td>{{ inv.replied_at.strftime('%m-%d %H:%M') if inv.replied_at else '—' }}</td>
                 <td>{{ inv.quote_amount or '—' }}</td>
+                <td>{{ inv.tooling_cost or '—' }}</td>
                 <td>{{ inv.lead_time_days ~ ' 天' if inv.lead_time_days else '—' }}</td>
                 <td class="text-muted">{{ inv.quote_comment or '—' }}</td>
                 <td>
@@ -209,11 +211,21 @@
                   {% endif %}
                 </td>
                 <td>
-                  {% if form.status.value == 'QUOTING' and user.role.value in ('purchase','engineer','admin') and not inv.replied_at %}
-                  <button class="btn btn-sm btn-outline-primary"
-                          data-bs-toggle="modal" data-bs-target="#replyModal-{{ inv.id }}">
-                    回填
-                  </button>
+                  {% set _show_reply_btn = (form.status.value == 'QUOTING'
+                         or (form.status.value == 'RETURNED' and form.reject_to == '採購'))
+                        and user.role.value in ('purchase','engineer','admin') %}
+                  {% if _show_reply_btn %}
+                    {% if form.status.value == 'RETURNED' and inv.replied_at %}
+                    <button class="btn btn-sm btn-outline-warning"
+                            data-bs-toggle="modal" data-bs-target="#replyModal-{{ inv.id }}">
+                      調整
+                    </button>
+                    {% elif not inv.replied_at %}
+                    <button class="btn btn-sm btn-outline-primary"
+                            data-bs-toggle="modal" data-bs-target="#replyModal-{{ inv.id }}">
+                      回填
+                    </button>
+                    {% endif %}
                   {% endif %}
                 </td>
               </tr>
@@ -289,7 +301,7 @@
             html += fmtRow(`不良率 (${defect}%)`, 'defect_amount');
             html += fmtRow(`管銷 (${oh}%)`, 'overhead_amount');
             html += fmtRow(`品保運 (${qa}%)`, 'qa_ship_amount');
-            html += fmtRow('成本合計', 'cost_total', 'table-light fw-bold');
+            html += fmtRow('成本合計（不含模治具）', 'cost_total', 'table-light fw-bold');
             // 利潤 — 左側標題顯示 rate，每欄顯示金額
             const profitRatePct = (data.profit_rate != null)
               ? (data.profit_rate*100).toFixed(1)
@@ -303,6 +315,12 @@
             profitRow += '</tr>';
             html += profitRow;
             html += fmtRow('最終報價單價', 'quote', 'table-warning fw-bold');
+            // 模治具費用獨立列於報價之下（不計入單價）
+            let hasTooling = false;
+            cols.forEach(c => { if (c.tooling_cost && c.tooling_cost > 0) hasTooling = true; });
+            if (hasTooling) {
+              html += fmtRow('模治具費用（獨立，不含於單價）', 'tooling_cost', 'table-info');
+            }
             html += '</tfoot></table></div>';
             target.innerHTML = html;
             return;
@@ -422,6 +440,15 @@
                   data-bs-toggle="modal" data-bs-target="#rejectQuoteBuModal">
             <i class="bi bi-x-lg me-1"></i>退回業務重算
           </button>
+          {% endif %}
+
+          {# 客戶報價單（對外乾淨版本，不含成本/供應商）— BU 核准後可預覽/列印 #}
+          {% if form.status.value in ('QUOTE_APPROVED','RFQ_DONE','NPI_STARTED','NPI_PENDING_BU','NPI_PENDING_PURCHASE','CLOSED')
+              and user.role.value in ('sales','bu','admin') %}
+          <a href="/npi-forms/{{ form.form_id }}/customer-quote" target="_blank"
+             class="btn btn-outline-success w-100 mb-2">
+            <i class="bi bi-file-earmark-text me-1"></i>預覽 / 列印 客戶報價單
+          </a>
           {% endif %}
 
           {# 業務：發送客戶報價（僅限 BU 核准後）#}
@@ -647,97 +674,87 @@
             <input name="dispatch_material" class="form-control" placeholder="例：SUS304 / AL6061 / ABS">
           </div>
           <div class="col-md-6">
-            <label class="form-label small">總需求量 <span class="text-muted">（整張單共用）</span></label>
+            <label class="form-label small">評估 MOQ <span class="text-muted">（最低訂購量，整張單共用）</span></label>
             <input name="dispatch_qty" type="number" min="0" class="form-control" placeholder="例：1000">
           </div>
         </div>
 
-        {# 業務上傳的圖面清單 + 快速動作 #}
+        {# 每張圖一張獨立製程表 — 若無圖則 fallback 到單一共用表 #}
         {% if drawings %}
-        <div class="border rounded p-2 mb-3 bg-light-subtle">
-          <div class="d-flex justify-content-between align-items-center mb-2">
-            <div class="fw-semibold small">
-              <i class="bi bi-images me-1"></i>業務已上傳圖面：{{ drawings|length }} 張
-              <span class="text-muted">— 每列可指定對應哪張圖，或選「共用/所有圖」</span>
-            </div>
-            <div class="btn-group btn-group-sm" role="group">
-              <button type="button" class="btn btn-outline-secondary" id="dispatchSharedMode"
-                      title="所有圖共用同一組製程（對應圖面欄留空）">
-                <i class="bi bi-grid-3x3-gap me-1"></i>共用模式
-              </button>
-              <button type="button" class="btn btn-outline-primary" id="dispatchPerDrawing"
-                      title="為每張圖自動建立一組空製程列">
-                <i class="bi bi-diagram-3 me-1"></i>每張圖獨立
-              </button>
-            </div>
-          </div>
-          <div class="d-flex flex-wrap gap-2">
-            {% for d in drawings %}
-            {% set ext = (d.original_name.rsplit('.',1)[-1] | lower) if '.' in d.original_name else '' %}
-            <div class="border rounded p-1 bg-white" style="width:110px">
+        <div class="small text-muted mb-2">
+          <i class="bi bi-info-circle me-1"></i>每張圖紙有獨立的製程排序表。同一製程可指定多家供應商做比價（於該圖紙的表內多新增一列）。
+        </div>
+        {% for d in drawings %}
+        {% set ext = (d.original_name.rsplit('.',1)[-1] | lower) if '.' in d.original_name else '' %}
+        <div class="border rounded p-3 mb-3 drawing-block" data-drawing-id="{{ d.id }}">
+          <div class="d-flex align-items-center gap-3 mb-2">
+            <div style="width:80px">
               {% if ext in ('png','jpg','jpeg','gif','webp') %}
-              <a href="#" class="doc-preview" data-url="/npi-forms/doc/preview/{{ d.id }}" data-name="{{ d.original_name }}" data-type="image">
-                <img src="/npi-forms/doc/preview/{{ d.id }}" class="w-100 rounded" style="height:70px; object-fit:cover">
+              <a href="#" class="doc-preview" data-url="/npi-forms/doc/preview/{{ d.id }}"
+                 data-name="{{ d.original_name }}" data-type="image">
+                <img src="/npi-forms/doc/preview/{{ d.id }}" class="w-100 rounded"
+                     style="height:60px; object-fit:cover">
               </a>
               {% else %}
               <a href="#" class="doc-preview d-flex justify-content-center align-items-center"
                  data-url="/npi-forms/doc/preview/{{ d.id }}" data-name="{{ d.original_name }}" data-type="pdf"
-                 style="height:70px">
+                 style="height:60px">
                 <i class="bi bi-file-earmark-pdf text-danger" style="font-size:2rem"></i>
               </a>
               {% endif %}
-              <div class="small text-truncate text-center mt-1" title="{{ d.original_name }}"
-                   style="font-size:0.7rem">
-                <span class="badge bg-secondary-subtle text-secondary">#{{ loop.index }}</span>
-                {{ d.original_name }}
-              </div>
             </div>
-            {% endfor %}
+            <div class="flex-grow-1">
+              <div class="fw-semibold">
+                <span class="badge bg-primary me-1">#{{ loop.index }}</span>{{ d.original_name }}
+              </div>
+              <div class="small text-muted">該圖紙需發案的製程 / 供應商</div>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-primary add-row-btn">
+              <i class="bi bi-plus"></i> 新增製程列
+            </button>
           </div>
-        </div>
-        {% endif %}
-
-        <div class="d-flex justify-content-between align-items-center mb-2">
-          <div class="fw-semibold">依圖紙新增製程列 — 每列 = 一個製程 / 一家供應商</div>
-          <button type="button" class="btn btn-sm btn-outline-primary" id="addDispatchRow">
-            <i class="bi bi-plus"></i> 新增製程列
-          </button>
-        </div>
-        <div class="table-responsive">
-          <table class="table table-sm table-bordered align-middle mb-0" id="dispatchTable">
+          <table class="table table-sm table-bordered align-middle mb-0">
             <thead class="table-light">
               <tr>
-                {% if drawings %}
-                <th style="min-width:160px">對應圖面</th>
-                {% endif %}
                 <th style="min-width:140px">製程</th>
                 <th style="min-width:220px">外發供應商 <span class="text-danger">*</span></th>
                 <th style="width:40px"></th>
               </tr>
             </thead>
-            <tbody id="dispatchRows">
-              {# JS 預設插入 2 列 #}
-            </tbody>
+            <tbody class="drawing-rows"></tbody>
+          </table>
+        </div>
+        {% endfor %}
+        {% else %}
+        {# 無圖面上傳 → 單一共用表 #}
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <div class="fw-semibold">依圖紙新增製程列 — 每列 = 一個製程 / 一家供應商</div>
+          <button type="button" class="btn btn-sm btn-outline-primary add-row-btn" data-target="#defaultRows">
+            <i class="bi bi-plus"></i> 新增製程列
+          </button>
+        </div>
+        <div class="table-responsive drawing-block" data-drawing-id="">
+          <table class="table table-sm table-bordered align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th style="min-width:140px">製程</th>
+                <th style="min-width:220px">外發供應商 <span class="text-danger">*</span></th>
+                <th style="width:40px"></th>
+              </tr>
+            </thead>
+            <tbody class="drawing-rows" id="defaultRows"></tbody>
           </table>
         </div>
         <div class="small text-muted mt-2">
-          <i class="bi bi-info-circle me-1"></i>同一個製程可指定多家供應商做比價；
-          {% if drawings %}「對應圖面」留「共用」代表所有圖通用，選定某張圖則代表該製程只針對該圖。{% endif %}
+          <i class="bi bi-info-circle me-1"></i>同一製程可指定多家供應商做比價（多新增一列）。
         </div>
-        {# Hidden template (供 JS 複製) #}
+        {% endif %}
+
+        {# Hidden template — 用 hidden input 綁 drawing_id #}
         <template id="dispatchRowTpl">
           <tr class="dispatch-row">
-            {% if drawings %}
             <td>
-              <select name="row_drawing_id" class="form-select form-select-sm row-drawing">
-                <option value="">— 共用 / 所有圖 —</option>
-                {% for d in drawings %}
-                <option value="{{ d.id }}">#{{ loop.index }} {{ d.original_name }}</option>
-                {% endfor %}
-              </select>
-            </td>
-            {% endif %}
-            <td>
+              <input type="hidden" name="row_drawing_id" class="row-drawing-id" value="">
               <input list="processList" name="row_process" class="form-control form-control-sm"
                      placeholder="例：CNC">
             </td>
@@ -772,74 +789,78 @@
 <script>
 (function(){
   const tpl = document.getElementById('dispatchRowTpl');
-  const body = document.getElementById('dispatchRows');
-  if (!tpl || !body) return;
-  function addRow(drawingId) {
+  if (!tpl) return;
+  function addRowToBlock(block) {
+    const tbody = block.querySelector('.drawing-rows');
+    if (!tbody) return;
     const frag = tpl.content.cloneNode(true);
-    if (drawingId !== undefined) {
-      const sel = frag.querySelector('.row-drawing');
-      if (sel) sel.value = String(drawingId);
-    }
-    body.appendChild(frag);
+    const drawingId = block.dataset.drawingId || '';
+    const hidden = frag.querySelector('.row-drawing-id');
+    if (hidden) hidden.value = drawingId;
+    tbody.appendChild(frag);
   }
-  document.getElementById('addDispatchRow').addEventListener('click', () => addRow());
+  // 點該圖區塊的「新增製程列」
   document.addEventListener('click', e => {
-    if (e.target.closest('#dispatchTable .row-del')) {
-      const tr = e.target.closest('tr.dispatch-row');
-      if (tr && body.querySelectorAll('tr.dispatch-row').length > 1) tr.remove();
+    const addBtn = e.target.closest('.drawing-block .add-row-btn');
+    if (addBtn) {
+      const block = addBtn.closest('.drawing-block');
+      if (block) addRowToBlock(block);
+      return;
+    }
+    const delBtn = e.target.closest('#dispatchModal .row-del');
+    if (delBtn) {
+      const tr = delBtn.closest('tr.dispatch-row');
+      const tbody = tr && tr.parentElement;
+      if (tr && tbody && tbody.querySelectorAll('tr.dispatch-row').length > 1) tr.remove();
     }
   });
-
-  // 共用模式：清掉所有既有列，新增 2 列（對應圖面留空＝共用）
-  const sharedBtn = document.getElementById('dispatchSharedMode');
-  if (sharedBtn) sharedBtn.addEventListener('click', () => {
-    body.innerHTML = '';
-    addRow(''); addRow('');
+  // 初始化：每張圖預設 2 列空白
+  document.querySelectorAll('#dispatchModal .drawing-block').forEach(block => {
+    const tbody = block.querySelector('.drawing-rows');
+    if (tbody && !tbody.querySelector('tr.dispatch-row')) {
+      addRowToBlock(block); addRowToBlock(block);
+    }
   });
-
-  // 每張圖獨立：針對每張圖各開 1 列空白（對應圖面綁該圖）
-  const perBtn = document.getElementById('dispatchPerDrawing');
-  if (perBtn) perBtn.addEventListener('click', () => {
-    const firstSel = document.querySelector('#dispatchRows .row-drawing')
-                   || document.querySelector('#dispatchRowTpl').content.querySelector('.row-drawing');
-    // 從 template option 取得所有圖 id（排除共用）
-    const tplSel = document.getElementById('dispatchRowTpl').content.querySelector('.row-drawing');
-    if (!tplSel) return;
-    const ids = Array.from(tplSel.options).map(o => o.value).filter(v => v !== '');
-    if (!ids.length) return;
-    body.innerHTML = '';
-    ids.forEach(id => addRow(id));
-  });
-
-  // 預設 2 列共用
-  if (!body.querySelector('tr.dispatch-row')) { addRow(); addRow(); }
 })();
 </script>
 {% endif %}
 
 {# 回填供應商報價 modals #}
 {% for inv in form.invites %}
-{% if form.status.value == 'QUOTING' and user.role.value in ('purchase','engineer','admin') and not inv.replied_at %}
+{% set _can_reply = (form.status.value == 'QUOTING'
+                   or (form.status.value == 'RETURNED' and form.reject_to == '採購'))
+                  and user.role.value in ('purchase','engineer','admin') %}
+{% if _can_reply %}
 <div class="modal fade" id="replyModal-{{ inv.id }}" tabindex="-1">
   <div class="modal-dialog">
     <form class="modal-content" method="post" enctype="multipart/form-data"
           action="/npi-forms/{{ form.form_id }}/invite/{{ inv.id }}/reply">
       <div class="modal-header">
-        <h5 class="modal-title">回填報價 — {{ inv.supplier.name }}</h5>
+        <h5 class="modal-title">
+          {% if inv.replied_at %}調整{% else %}回填{% endif %}報價 — {{ inv.supplier.name }}
+        </h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body row g-3">
-        <div class="col-md-6">
-          <label class="form-label">報價金額</label>
-          <input name="quote_amount" type="number" step="0.01" class="form-control">
+        <div class="col-md-4">
+          <label class="form-label">單價報價</label>
+          <input name="quote_amount" type="number" step="0.01" class="form-control"
+                 value="{{ inv.quote_amount if inv.quote_amount is not none else '' }}">
         </div>
-        <div class="col-md-6">
+        <div class="col-md-4">
+          <label class="form-label">模治具費用 <small class="text-muted">（獨立計價）</small></label>
+          <input name="tooling_cost" type="number" step="0.01" class="form-control"
+                 value="{{ inv.tooling_cost if inv.tooling_cost is not none else '' }}"
+                 placeholder="一次性攤提或買斷金額">
+        </div>
+        <div class="col-md-4">
           <label class="form-label">交期（天）</label>
-          <input name="lead_time_days" type="number" class="form-control">
+          <input name="lead_time_days" type="number" class="form-control"
+                 value="{{ inv.lead_time_days if inv.lead_time_days is not none else '' }}">
         </div>
         <div class="col-12">
           <label class="form-label">備註</label>
-          <textarea name="quote_comment" rows="2" class="form-control"></textarea>
+          <textarea name="quote_comment" rows="2" class="form-control">{{ inv.quote_comment or '' }}</textarea>
         </div>
         <div class="col-12">
           <label class="form-label">上傳報價檔案（自動歸檔 NAS）</label>
@@ -930,7 +951,7 @@
                 </th>
               </tr>
               <tr class="fw-bold table-light">
-                <th class="text-start">成本合計</th>
+                <th class="text-start">成本合計 <small class="text-muted fw-normal">（不含模治具）</small></th>
               </tr>
               <tr>
                 <th class="text-start">
@@ -942,6 +963,11 @@
               </tr>
               <tr class="table-warning fw-bold">
                 <th class="text-start">最終報價單價</th>
+              </tr>
+              <tr class="table-info">
+                <th class="text-start">
+                  模治具費用 <small class="text-muted fw-normal">（獨立計價，不含於單價）</small>
+                </th>
               </tr>
             </tfoot>
           </table>
@@ -999,6 +1025,16 @@
     {% for inv in form.invites %}
       {% if inv.quote_amount and inv.process_name %}
       m[`{{ inv.drawing_doc_id or 0 }}||{{ inv.process_name }}`] = {{ inv.quote_amount }};
+      {% endif %}
+    {% endfor %}
+    return m;
+  })();
+  // 模治具費用對應表：按 drawing_id 彙總（同圖不同供應商則取最高 / 可由使用者覆寫）
+  const toolingByDrawing = (function(){
+    const m = {};
+    {% for inv in form.invites %}
+      {% if inv.tooling_cost %}
+      (function(k, v){ if (!(k in m) || v > m[k]) m[k] = v; })('{{ inv.drawing_doc_id or 0 }}', {{ inv.tooling_cost }});
       {% endif %}
     {% endfor %}
     return m;
@@ -1064,7 +1100,7 @@
       while (tr.children.length > 1) tr.removeChild(tr.lastChild);
     });
     const trs = tfoot.querySelectorAll('tr');
-    // row 0: 製程小計, 1: 不良率, 2: 管銷, 3: 品保運, 4: 成本合計, 5: 利潤, 6: 最終報價
+    // row 0: 製程小計, 1: 不良率, 2: 管銷, 3: 品保運, 4: 成本合計, 5: 利潤, 6: 最終報價, 7: 模治具費用(input, 獨立)
     for (let i = 0; i < nCols; i++) {
       trs[0].insertAdjacentHTML('beforeend', `<td class="text-end sum-col" data-col="${i}">—</td>`);
       trs[1].insertAdjacentHTML('beforeend', `<td class="text-end defect-col" data-col="${i}">—</td>`);
@@ -1073,6 +1109,19 @@
       trs[4].insertAdjacentHTML('beforeend', `<td class="text-end cost-col" data-col="${i}">—</td>`);
       trs[5].insertAdjacentHTML('beforeend', `<td class="text-end profit-col" data-col="${i}">—</td>`);
       trs[6].insertAdjacentHTML('beforeend', `<td class="text-end quote-col" data-col="${i}">—</td>`);
+      // 模治具費用：每欄一個 input，獨立計價（不加入 cost_total 與最終報價）
+      // 預設帶入供應商填報（依對應 drawing_id）
+      const drawId = colDrawingId(i);
+      const autoTooling = (drawId != null && toolingByDrawing[String(drawId)] != null)
+        ? toolingByDrawing[String(drawId)] : (toolingByDrawing['0'] != null ? toolingByDrawing['0'] : null);
+      let tooling = '';
+      if (initData && initData.columns && initData.columns[i] && initData.columns[i].tooling_cost != null) {
+        tooling = initData.columns[i].tooling_cost;
+      } else if (autoTooling != null) {
+        tooling = autoTooling;
+      }
+      trs[7].insertAdjacentHTML('beforeend',
+        `<td><input type="number" step="any" class="form-control form-control-sm tooling-col" data-col="${i}" value="${tooling}" placeholder="一次性"></td>`);
     }
   }
   function recalc() {
@@ -1093,6 +1142,7 @@
       const defectAmt = sub * defect;
       const ohAmt = sub * oh;
       const qaAmt = sub * qa;
+      // 模治具費用獨立計價，不計入 costTotal/最終報價
       const costTotal = sub + defectAmt + ohAmt + qaAmt;
       const profitAmt = costTotal * profit;
       const quote = costTotal + profitAmt;
@@ -1186,11 +1236,14 @@
       const costTotal = parseFloat(document.querySelector(`.cost-col[data-col="${i}"]`).textContent)||0;
       const profitAmt = parseFloat(document.querySelector(`.profit-col[data-col="${i}"]`).textContent)||0;
       const quote = parseFloat(document.querySelector(`.quote-col[data-col="${i}"]`).textContent)||0;
+      const toolingInp = document.querySelector(`.tooling-col[data-col="${i}"]`);
+      const tooling = toolingInp ? (parseFloat(toolingInp.value)||0) : 0;
       columns.push({
         label, subtotal: sub,
         defect_amount: +(sub*defect).toFixed(2),
         overhead_amount: +(sub*oh).toFixed(2),
         qa_ship_amount: +(sub*qa).toFixed(2),
+        tooling_cost: tooling,
         cost_total: costTotal,
         profit_amount: profitAmt,
         quote: quote
@@ -1225,18 +1278,35 @@
 </script>
 {% endif %}
 
-{# BU 退回業務報價 #}
+{# BU 退回業務報價 / 退回採購議價 #}
 {% if form.status.value == 'PENDING_QUOTE_BU' and user.role.value in ('bu','admin') %}
 <div class="modal fade" id="rejectQuoteBuModal" tabindex="-1">
   <div class="modal-dialog">
     <form class="modal-content" method="post" action="/npi-forms/{{ form.form_id }}/reject-quote-bu">
-      <div class="modal-header"><h5 class="modal-title">退回業務重算</h5>
+      <div class="modal-header"><h5 class="modal-title">退回重新處理</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
+        <label class="form-label">退回對象 <span class="text-danger">*</span></label>
+        <div class="mb-3">
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="reject_target" id="rejectToSales"
+                   value="業務" checked>
+            <label class="form-check-label" for="rejectToSales">
+              <strong>退回業務</strong> — 重新試算（調整毛利、料件單價、費率）
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="reject_target" id="rejectToPurchase"
+                   value="採購">
+            <label class="form-check-label" for="rejectToPurchase">
+              <strong>退回採購</strong> — 議價調整成本（重新與供應商談 Tooling / 單價）
+            </label>
+          </div>
+        </div>
         <label class="form-label">退回原因 <span class="text-danger">*</span></label>
         <textarea name="comment" rows="3" class="form-control" required
-                  placeholder="例：毛利偏低、料件成本請重新確認…"></textarea>
+                  placeholder="例：毛利偏低、料件成本請重新確認；或模具費偏高請採購再議價…"></textarea>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
@@ -1258,8 +1328,15 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
+        <div class="alert alert-info small">
+          <i class="bi bi-info-circle me-1"></i>
+          系統已產生對外的「客戶報價單」頁面（<strong>不含成本/供應商資訊</strong>）。
+          <a href="/npi-forms/{{ form.form_id }}/customer-quote" target="_blank" class="fw-bold">
+            <i class="bi bi-box-arrow-up-right ms-1"></i>開啟預覽並列印為 PDF
+          </a>，再於下方附件上傳此 PDF 作為客戶報價單。
+        </div>
         <div class="alert alert-warning small">
-          請上傳【成本分析表】與【客戶報價單】（必要）。<br>
+          請上傳【客戶報價單】PDF（必要）。成本分析表為內部參考，<strong>不會寄給客戶</strong>。<br>
           將自動以 mail 寄送至：<strong>{{ form.customer_email or '（尚未填客戶 Email）' }}</strong>
         </div>
         <div class="mb-2">

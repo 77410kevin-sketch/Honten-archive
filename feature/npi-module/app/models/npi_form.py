@@ -111,6 +111,7 @@ class NPISupplierInvite(Base):
 
     replied_at     = Column(DateTime, nullable=True)
     quote_amount   = Column(Float, nullable=True)
+    tooling_cost   = Column(Float, nullable=True)       # 模治具費用（獨立計價，不計入單價）
     lead_time_days = Column(Integer, nullable=True)
     quote_comment  = Column(Text, nullable=True)
     is_selected    = Column(Boolean, default=False)     # NPI 最終選用

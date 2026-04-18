@@ -93,7 +93,7 @@
             <div class="col-md-3">
               <select name="attach_categories" class="form-select">
                 {% for c in ATTACH_CATEGORIES %}
-                <option>{{ c }}</option>
+                <option{% if c == '圖面' %} selected{% endif %}>{{ c }}</option>
                 {% endfor %}
               </select>
             </div>

@@ -90,6 +90,7 @@ async def run_migrations():
         "ALTER TABLE npi_supplier_invites ADD COLUMN qty INTEGER",
         "ALTER TABLE npi_supplier_invites ADD COLUMN expected_lead_days INTEGER",
         "ALTER TABLE npi_supplier_invites ADD COLUMN drawing_doc_id INTEGER",
+        "ALTER TABLE npi_supplier_invites ADD COLUMN tooling_cost FLOAT",
         # PCNApproval 退回對象欄位
         "ALTER TABLE pcn_approvals ADD COLUMN reject_target VARCHAR(50)",
         # ECN 設計變更庫存盤點

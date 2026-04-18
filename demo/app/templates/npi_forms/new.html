@@ -13,8 +13,12 @@
       <p class="small text-muted mb-2">
         上傳客戶寄來的詢價信（<strong>.txt / .pdf / .eml</strong>），AI 會自動擷取客戶、產品、規格、數量、期限等欄位填入下方表格，業務確認後再送出。
       </p>
-      <div class="input-group">
-        <input type="file" id="aiInquiryFile" class="form-control" accept=".txt,.pdf,.eml,.msg">
+      <div class="d-flex align-items-center gap-2 flex-wrap file-picker-wrap">
+        <label class="btn btn-outline-primary mb-0">
+          <i class="bi bi-upload me-1"></i>選擇詢價信檔案
+          <input type="file" id="aiInquiryFile" class="d-none" accept=".txt,.pdf,.eml,.msg">
+        </label>
+        <span class="file-picker-name text-muted small flex-grow-1">（尚未選擇）</span>
         <button type="button" class="btn btn-primary" id="aiParseBtn">
           <i class="bi bi-magic me-1"></i>解析並填入
         </button>
@@ -92,8 +96,8 @@
           送審時須至少包含【客戶詢價信】與【規格書或圖面】其一。
         </p>
         <div id="attach-rows">
-          <div class="row g-2 mb-2 attach-row">
-            <div class="col-md-4">
+          <div class="row g-2 mb-2 attach-row align-items-center">
+            <div class="col-md-3">
               <select name="attach_categories" class="form-select">
                 <option>客戶詢價信</option>
                 <option>規格書</option>
@@ -101,10 +105,16 @@
                 <option>其它</option>
               </select>
             </div>
-            <div class="col-md-7">
-              <input type="file" name="attach_files" class="form-control">
+            <div class="col-md-8">
+              <div class="d-flex align-items-center gap-2 flex-wrap file-picker-wrap">
+                <label class="btn btn-outline-secondary btn-sm mb-0">
+                  <i class="bi bi-paperclip me-1"></i>選擇檔案
+                  <input type="file" name="attach_files" class="d-none">
+                </label>
+                <span class="file-picker-name text-muted small">（尚未選擇）</span>
+              </div>
             </div>
-            <div class="col-md-1 d-flex align-items-center">
+            <div class="col-md-1">
               <button type="button" class="btn btn-sm btn-outline-danger remove-row">
                 <i class="bi bi-x"></i>
               </button>
@@ -128,7 +138,10 @@
 document.getElementById("add-attach").addEventListener("click", () => {
   const first = document.querySelector(".attach-row");
   const clone = first.cloneNode(true);
-  clone.querySelector("input[type=file]").value = "";
+  const fInput = clone.querySelector('input[type=file]');
+  if (fInput) fInput.value = "";
+  const nm = clone.querySelector('.file-picker-name');
+  if (nm) nm.textContent = '（尚未選擇）';
   document.getElementById("attach-rows").appendChild(clone);
 });
 document.addEventListener("click", (e) => {

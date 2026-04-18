@@ -406,7 +406,13 @@
         </div>
         <div class="col-12">
           <label class="form-label">上傳報價檔案（自動歸檔 NAS）</label>
-          <input name="attach_files" type="file" class="form-control" multiple>
+          <div class="d-flex align-items-center gap-2 flex-wrap file-picker-wrap">
+            <label class="btn btn-outline-primary mb-0">
+              <i class="bi bi-paperclip me-1"></i>選擇檔案（可多選）
+              <input type="file" name="attach_files" class="d-none" multiple>
+            </label>
+            <span class="file-picker-name text-muted small">（尚未選擇）</span>
+          </div>
         </div>
       </div>
       <div class="modal-footer">
@@ -437,12 +443,24 @@
         <div class="mb-2">
           <label class="form-label">成本分析表（必要）</label>
           <input type="hidden" name="attach_categories" value="成本分析表">
-          <input type="file" name="attach_files" class="form-control">
+          <div class="d-flex align-items-center gap-2 flex-wrap file-picker-wrap">
+            <label class="btn btn-outline-primary mb-0">
+              <i class="bi bi-paperclip me-1"></i>選擇檔案
+              <input type="file" name="attach_files" class="d-none">
+            </label>
+            <span class="file-picker-name text-muted small">（尚未選擇）</span>
+          </div>
         </div>
         <div class="mb-3">
           <label class="form-label">客戶報價單（必要）</label>
           <input type="hidden" name="attach_categories" value="客戶報價單">
-          <input type="file" name="attach_files" class="form-control">
+          <div class="d-flex align-items-center gap-2 flex-wrap file-picker-wrap">
+            <label class="btn btn-outline-primary mb-0">
+              <i class="bi bi-paperclip me-1"></i>選擇檔案
+              <input type="file" name="attach_files" class="d-none">
+            </label>
+            <span class="file-picker-name text-muted small">（尚未選擇）</span>
+          </div>
         </div>
         <label class="form-label">成本分析摘要 / 給客戶的補充說明</label>
         <textarea name="cost_analysis_note" class="form-control" rows="3"></textarea>
@@ -497,7 +515,13 @@
         <div class="col-12">
           <label class="form-label">模具請購單（必要附件）</label>
           <input type="hidden" name="attach_categories" value="模具請購單">
-          <input type="file" name="attach_files" class="form-control">
+          <div class="d-flex align-items-center gap-2 flex-wrap file-picker-wrap">
+            <label class="btn btn-outline-primary mb-0">
+              <i class="bi bi-paperclip me-1"></i>選擇檔案
+              <input type="file" name="attach_files" class="d-none">
+            </label>
+            <span class="file-picker-name text-muted small">（尚未選擇）</span>
+          </div>
         </div>
         <div class="col-12">
           <label class="form-label">備註</label>
@@ -564,7 +588,13 @@
         </div>
         <div class="mb-3">
           <label class="form-label">議價記錄附件</label>
-          <input name="attach_files" type="file" class="form-control" multiple>
+          <div class="d-flex align-items-center gap-2 flex-wrap file-picker-wrap">
+            <label class="btn btn-outline-primary mb-0">
+              <i class="bi bi-paperclip me-1"></i>選擇檔案（可多選）
+              <input type="file" name="attach_files" class="d-none" multiple>
+            </label>
+            <span class="file-picker-name text-muted small">（尚未選擇）</span>
+          </div>
         </div>
         <div class="alert alert-info small mb-0">
           結案後系統將自動：<br>

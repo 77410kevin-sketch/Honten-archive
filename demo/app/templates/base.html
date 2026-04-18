@@ -87,5 +87,22 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+// ── 全域「選擇檔案」元件（<label class=file-picker>…<input type=file>…</label>）──
+// 監聽 change 自動更新鄰近的 .file-picker-name 顯示檔名；支援動態新增列
+document.addEventListener('change', (e) => {
+  const inp = e.target;
+  if (inp.tagName !== 'INPUT' || inp.type !== 'file') return;
+  const wrapper = inp.closest('.file-picker-wrap');
+  if (!wrapper) return;
+  const nameEl = wrapper.querySelector('.file-picker-name');
+  if (!nameEl) return;
+  const files = inp.files;
+  if (!files || !files.length) { nameEl.textContent = '（尚未選擇）'; return; }
+  if (files.length === 1) nameEl.textContent = files[0].name;
+  else nameEl.textContent = `已選 ${files.length} 個檔案`;
+});
+</script>
 </body>
 </html>

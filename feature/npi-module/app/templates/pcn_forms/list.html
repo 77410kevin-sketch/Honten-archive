@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}PCN/ECN 變更管理{% endblock %}
+{% block content %}
+<div class="container-fluid py-3">
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0"><i class="bi bi-arrow-repeat me-2 text-primary"></i>PCN/ECN 變更管理</h4>
+    {% if user.role.value in ('engineer', 'admin') %}
+    <a href="/pcn-forms/new" class="btn btn-primary">
+      <i class="bi bi-plus-circle me-1"></i>新建 PCN/ECN
+    </a>
+    {% endif %}
+  </div>
+
+  {# 狀態說明列 #}
+  <div class="d-flex flex-wrap gap-2 mb-3 small">
+    <span class="badge bg-secondary">草稿</span>
+    <span class="badge bg-primary">PCN 待品保</span>
+    <span class="badge bg-info text-dark">PCN 待產線主管</span>
+    <span class="badge" style="background:#0dcaf0;color:#000">ECN 待工程確認</span>
+    <span class="badge" style="background:#6f42c1;color:#fff">ECN 待品保確認</span>
+    <span class="badge bg-warning text-dark">待 BU 審核</span>
+    <span class="badge bg-success">已核准</span>
+    <span class="badge bg-danger">退回</span>
+    <span class="badge bg-dark">結案</span>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>單號</th>
+              <th>類型</th>
+              <th>產品名稱</th>
+              <th>提出部門</th>
+              <th>狀態</th>
+              <th>建單者</th>
+              <th>建立日期</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for f in forms %}
+            <tr>
+              <td><a href="/pcn-forms/{{ f.form_id }}" class="fw-semibold">{{ f.form_id }}</a></td>
+              <td>
+                {% if f.type.value == 'PCN' %}
+                  <span class="badge bg-primary-subtle text-primary border border-primary-subtle">新產品導入</span>
+                {% else %}
+                  {% if f.change_types and f.change_types != '[]' %}
+                    {% set cts = f.change_types[1:-1] | replace('"', '') %}
+                    <span class="badge bg-warning-subtle text-warning border border-warning-subtle">ECN {{ cts }}</span>
+                  {% else %}
+                    <span class="badge bg-warning-subtle text-warning border border-warning-subtle">ECN</span>
+                  {% endif %}
+                {% endif %}
+              </td>
+              <td>{{ f.product_name }}</td>
+              <td><span class="badge bg-light text-dark border">{{ f.department or '—' }}</span></td>
+              <td>
+                {% if f.status.value == 'DRAFT' %}
+                  <span class="badge bg-secondary">草稿</span>
+                {% elif f.status.value == 'ECN_PENDING_ENG' %}
+                  <span class="badge" style="background:#0dcaf0;color:#000">ECN 待工程確認</span>
+                {% elif f.status.value == 'ECN_PENDING_QC' %}
+                  <span class="badge" style="background:#6f42c1;color:#fff">ECN 待品保確認</span>
+                {% elif f.status.value == 'PENDING_QC' %}
+                  <span class="badge bg-primary">PCN 待品保</span>
+                {% elif f.status.value == 'PENDING_PRODUCTION' %}
+                  <span class="badge bg-info text-dark">PCN 待產線主管</span>
+                {% elif f.status.value == 'PENDING_BU_APPROVAL' %}
+                  <span class="badge bg-warning text-dark">待 BU 審核</span>
+                {% elif f.status.value == 'APPROVED' %}
+                  <span class="badge bg-success">已核准</span>
+                {% elif f.status.value == 'RETURNED' %}
+                  <span class="badge bg-danger">退回</span>
+                {% elif f.status.value == 'CLOSED' %}
+                  <span class="badge bg-dark">結案</span>
+                {% endif %}
+              </td>
+              <td>{{ f.creator.display_name if f.creator else '—' }}</td>
+              <td class="text-muted small">{{ f.created_at.strftime('%Y-%m-%d') }}</td>
+              <td>
+                <a href="/pcn-forms/{{ f.form_id }}" class="btn btn-sm btn-outline-secondary">
+                  <i class="bi bi-eye"></i>
+                </a>
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="7" class="text-center text-muted py-4">
+                <i class="bi bi-inbox fs-4 d-block mb-1"></i>目前沒有符合條件的 PCN/ECN 單
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

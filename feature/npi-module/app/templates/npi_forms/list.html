@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}NPI 新產品開發{% endblock %}
+{% block content %}
+<div class="container-fluid py-3">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0"><i class="bi bi-box-seam me-2 text-primary"></i>NPI 新產品開發</h4>
+    {% if user.role.value in ('sales', 'admin') %}
+    <a href="/npi-forms/new" class="btn btn-primary">
+      <i class="bi bi-plus-circle me-1"></i>新建 NPI/RFQ 單
+    </a>
+    {% endif %}
+  </div>
+
+  <div class="d-flex flex-wrap gap-2 mb-3 small">
+    <span class="badge bg-secondary">草稿</span>
+    <span class="badge bg-primary">待工程派發</span>
+    <span class="badge bg-info text-dark">報價中</span>
+    <span class="badge" style="background:#6f42c1;color:#fff">報價收齊</span>
+    <span class="badge bg-success">已發客戶報價</span>
+    <span class="badge bg-warning text-dark">NPI 啟動</span>
+    <span class="badge bg-warning">待 BU 核准</span>
+    <span class="badge" style="background:#0dcaf0;color:#000">待採購議價</span>
+    <span class="badge bg-danger">退回</span>
+    <span class="badge bg-dark">結案</span>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>單號</th>
+              <th>階段</th>
+              <th>客戶 / 產品</th>
+              <th>狀態</th>
+              <th>建單者</th>
+              <th>建立日期</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for f in forms %}
+            <tr>
+              <td><a href="/npi-forms/{{ f.form_id }}" class="fw-semibold">{{ f.form_id }}</a></td>
+              <td>
+                {% if f.stage.value == 'RFQ' %}
+                  <span class="badge bg-info-subtle text-info border border-info-subtle">RFQ 詢價</span>
+                {% else %}
+                  <span class="badge bg-warning-subtle text-warning border border-warning-subtle">NPI 開發</span>
+                {% endif %}
+              </td>
+              <td>
+                <div class="fw-semibold">{{ f.customer_name }}</div>
+                <div class="text-muted small">{{ f.product_name }}{% if f.product_model %} / {{ f.product_model }}{% endif %}</div>
+              </td>
+              <td>
+                {% set s = f.status.value %}
+                {% if s == 'DRAFT' %}<span class="badge bg-secondary">草稿</span>
+                {% elif s == 'ENG_DISPATCH' %}<span class="badge bg-primary">待工程派發</span>
+                {% elif s == 'QUOTING' %}<span class="badge bg-info text-dark">報價中</span>
+                {% elif s == 'QUOTES_COLLECTED' %}<span class="badge" style="background:#6f42c1;color:#fff">報價收齊</span>
+                {% elif s == 'RFQ_DONE' %}<span class="badge bg-success">已發客戶報價</span>
+                {% elif s == 'NPI_STARTED' %}<span class="badge bg-warning text-dark">NPI 啟動</span>
+                {% elif s == 'NPI_PENDING_BU' %}<span class="badge bg-warning">待 BU 核准</span>
+                {% elif s == 'NPI_PENDING_PURCHASE' %}<span class="badge" style="background:#0dcaf0;color:#000">待採購議價</span>
+                {% elif s == 'RETURNED' %}<span class="badge bg-danger">退回 · {{ f.reject_to or '' }}</span>
+                {% elif s == 'CLOSED' %}<span class="badge bg-dark">結案</span>
+                {% endif %}
+              </td>
+              <td>{{ f.creator.display_name if f.creator else '—' }}</td>
+              <td class="text-muted small">{{ f.created_at.strftime('%Y-%m-%d') }}</td>
+              <td>
+                <a href="/npi-forms/{{ f.form_id }}" class="btn btn-sm btn-outline-secondary">
+                  <i class="bi bi-eye"></i>
+                </a>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" class="text-center text-muted py-4">
+              <i class="bi bi-inbox fs-4 d-block mb-1"></i>目前沒有符合條件的 NPI 單
+            </td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

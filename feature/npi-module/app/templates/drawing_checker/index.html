@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>進料檢驗表</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root{--blue-dark:#0d2137;--blue-mid:#1a3d5c;--blue-acc:#2196f3;--blue-lite:#e8f4fd;--green:#22c55e;--red:#ef4444;--yellow:#fbbf24;--gray-bg:#f1f5f9;--border:#cbd5e1;}
+*{box-sizing:border-box;}
+body{background:var(--gray-bg);font-family:"Microsoft JhengHei","微軟正黑體",sans-serif;min-height:100vh;}
+.topbar{background:linear-gradient(135deg,var(--blue-dark),var(--blue-mid));color:#fff;padding:12px 20px;display:flex;align-items:center;gap:10px;box-shadow:0 2px 12px rgba(0,0,0,.35);position:sticky;top:0;z-index:100;}
+.topbar h1{font-size:1.1rem;margin:0;font-weight:700;}
+.upload-card{background:#fff;border-radius:14px;box-shadow:0 2px 14px rgba(0,0,0,.07);padding:22px;position:sticky;top:68px;}
+#drop-zone{border:2.5px dashed var(--blue-acc);border-radius:10px;padding:30px 16px;text-align:center;cursor:pointer;transition:.2s;background:var(--blue-lite);}
+#drop-zone:hover,#drop-zone.drag-over{background:#d0e9fa;border-color:#0d7ad4;}
+#drop-zone .icon{font-size:2.4rem;color:var(--blue-acc);margin-bottom:8px;}
+#drop-zone p{margin:0;color:#475569;font-size:.85rem;}
+#drop-zone strong{color:var(--blue-acc);}
+.thumb-wrap{display:none;margin-top:12px;}
+#thumb-img{width:100%;max-height:140px;object-fit:contain;border-radius:6px;border:1px solid var(--border);background:#f8fafc;}
+#file-info{font-size:.72rem;color:#94a3b8;text-align:center;margin-top:4px;}
+#analyze-btn{background:linear-gradient(135deg,#1565c0,var(--blue-acc));border:none;border-radius:8px;padding:9px 0;font-size:.92rem;font-weight:700;box-shadow:0 3px 10px rgba(33,150,243,.35);transition:.15s;width:100%;}
+#analyze-btn:hover:not(:disabled){transform:translateY(-1px);}
+#analyze-btn:disabled{opacity:.6;}
+#mock-btn{width:100%;border:1.5px dashed #f59e0b;background:transparent;color:#b45309;border-radius:8px;padding:7px 0;font-size:.82rem;font-weight:600;cursor:pointer;transition:.15s;}
+#mock-btn:hover{background:#fef9c3;}
+#loading-section{display:none;text-align:center;padding:40px 20px;}
+.spinner-ring{width:56px;height:56px;border:5px solid #e2e8f0;border-top-color:var(--blue-acc);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 14px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading-text{color:#64748b;font-size:.88rem;}
+.loading-dots::after{content:'';animation:dots 1.5s infinite;}
+@keyframes dots{0%{content:''}33%{content:'.'}66%{content:'..'}100%{content:'...'}}
+#result-section{display:none;}
+#error-section{display:none;}
+
+/* 進料檢驗表主體 */
+.form-card{background:#fff;border-radius:10px;box-shadow:0 2px 14px rgba(0,0,0,.07);overflow:hidden;margin-bottom:14px;}
+.form-title-bar{background:var(--blue-mid);color:#fff;padding:8px 14px;font-size:.88rem;font-weight:700;display:flex;align-items:center;gap:6px;}
+
+/* 圖面預覽 */
+.drawing-panel{background:#fff;border-radius:10px;box-shadow:0 2px 14px rgba(0,0,0,.07);overflow:hidden;margin-bottom:14px;}
+.drawing-panel-header{background:var(--blue-mid);color:#fff;padding:8px 14px;font-size:.85rem;font-weight:600;display:flex;justify-content:space-between;align-items:center;}
+.btn-toggle{background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:5px;padding:2px 10px;font-size:.75rem;cursor:pointer;}
+#drawing-img{width:100%;height:auto;display:block;background:#f8fafc;max-height:340px;object-fit:contain;}
+
+/* 表頭資訊列 */
+.info-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-left:1px solid var(--border);border-top:1px solid var(--border);}
+.info-cell{border-right:1px solid var(--border);border-bottom:1px solid var(--border);display:flex;align-items:stretch;}
+.info-label{background:#e8f0fa;font-size:.72rem;font-weight:700;padding:4px 7px;white-space:nowrap;display:flex;align-items:center;color:#1a3d5c;border-right:1px solid var(--border);}
+.info-val{flex:1;padding:3px 7px;display:flex;align-items:center;}
+.info-val input,.info-val select{border:none;outline:none;width:100%;font-size:.78rem;font-family:inherit;background:transparent;}
+.info-val input[type=date]{font-size:.78rem;}
+
+/* 外觀檢驗表格 */
+.appear-table{width:100%;border-collapse:collapse;font-size:.78rem;}
+.appear-table th{background:#e8f0fa;text-align:center;padding:5px;border:1px solid var(--border);font-weight:700;color:#1a3d5c;font-size:.75rem;}
+.appear-table td{border:1px solid var(--border);padding:4px;text-align:center;vertical-align:middle;}
+.appear-table td input{width:100%;border:none;outline:none;text-align:center;font-size:.78rem;background:transparent;}
+
+/* 尺寸檢驗表格 */
+.check-table{width:100%;border-collapse:collapse;font-size:.76rem;min-width:1100px;}
+.check-table thead tr:first-child th{background:var(--blue-mid);color:#fff;text-align:center;padding:6px 3px;font-weight:700;border:1px solid #1e4f7a;white-space:nowrap;}
+.check-table thead tr:last-child th{background:#1a4a72;color:#b8d4ee;text-align:center;padding:4px 2px;font-size:.68rem;border:1px solid #1e4f7a;}
+.check-table tbody tr:nth-child(even) td{background:#f7fbff;}
+.check-table tbody tr:hover td{background:#edf6ff!important;}
+.check-table td{border:1px solid #dde5ef;padding:4px 3px;vertical-align:middle;text-align:center;}
+.check-table td.name-col{text-align:left;padding-left:7px;min-width:120px;}
+.tol-pos{color:#059669;font-weight:700;}
+.tol-neg{color:#dc2626;font-weight:700;}
+.tool-select{border:1.5px solid #bfd4e8;border-radius:4px;padding:1px 2px;font-size:.72rem;background:#f0f8ff;cursor:pointer;outline:none;width:76px;}
+.tol-input{width:46px;border:1.5px solid #bfd4e8;border-radius:4px;padding:2px 3px;text-align:center;font-size:.72rem;background:#f7fff2;outline:none;}
+.meas-input{width:52px;border:1.5px solid #bfd4e8;border-radius:4px;padding:2px 3px;text-align:center;font-size:.72rem;background:#f0f8ff;outline:none;}
+.meas-input.out{background:#fff0f0;border-color:#fca5a5;color:#b91c1c;font-weight:700;}
+.meas-input.ok{background:#f0fff6;border-color:#86efac;color:#166534;}
+.badge-pass{background:#dcfce7;color:#15803d;font-weight:800;font-size:.72rem;padding:2px 8px;border-radius:20px;border:1.5px solid #86efac;white-space:nowrap;}
+.badge-fail{background:#fee2e2;color:#b91c1c;font-weight:800;font-size:.72rem;padding:2px 8px;border-radius:20px;border:1.5px solid #fca5a5;white-space:nowrap;}
+.badge-pending{background:#fef9c3;color:#92400e;font-weight:700;font-size:.7rem;padding:2px 8px;border-radius:20px;border:1.5px solid #fde68a;white-space:nowrap;}
+.btn-del-row{background:transparent;border:none;color:#ef4444;cursor:pointer;font-size:.82rem;padding:2px 4px;border-radius:4px;line-height:1;}
+.btn-del-row:hover{background:#fee2e2;}
+.name-input{border:none;background:transparent;width:100%;font-size:.76rem;outline:none;font-family:inherit;color:#1e293b;}
+.nom-input{width:56px;border:1.5px solid #bfd4e8;border-radius:4px;padding:2px 3px;text-align:center;font-size:.72rem;background:#f0f8ff;outline:none;}
+
+/* 統計 */
+.stat-bar{display:flex;gap:16px;flex-wrap:wrap;padding:8px 14px;background:#fff;border-radius:8px;box-shadow:0 1px 6px rgba(0,0,0,.05);margin-bottom:10px;font-size:.78rem;}
+.stat-dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:4px;}
+
+/* 下段區域 */
+.jig-table{width:100%;border-collapse:collapse;font-size:.78rem;}
+.jig-table th{background:#e8f0fa;text-align:center;padding:5px;border:1px solid var(--border);font-weight:700;color:#1a3d5c;font-size:.75rem;min-width:80px;}
+.jig-table td{border:1px solid var(--border);padding:4px;text-align:center;height:40px;}
+.jig-table td input{width:100%;border:none;outline:none;text-align:center;font-size:.78rem;background:transparent;}
+.bottom-area{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--border);}
+.bottom-cell{padding:6px 10px;}
+.bottom-cell textarea{width:100%;border:none;outline:none;resize:none;font-size:.78rem;font-family:inherit;min-height:54px;background:transparent;}
+.bottom-label{font-size:.72rem;font-weight:700;color:#1a3d5c;border-bottom:1px solid #e2e8f0;padding-bottom:2px;margin-bottom:4px;}
+
+/* 備註工具列 */
+.remark-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--border);font-size:.76rem;}
+.remark-cell{padding:6px 10px;border-right:1px solid var(--border);}
+.remark-cell:last-child{border-right:none;}
+.remark-cell textarea{width:100%;border:none;outline:none;resize:none;font-family:inherit;font-size:.76rem;background:transparent;min-height:60px;}
+
+/* 簽核 */
+.sign-row{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--border);border-top:none;font-size:.78rem;}
+.sign-cell{padding:6px 10px;border-right:1px solid var(--border);display:flex;align-items:center;gap:6px;}
+.sign-cell:last-child{border-right:none;}
+.sign-cell input{flex:1;border:none;border-bottom:1px solid #cbd5e1;outline:none;font-size:.78rem;background:transparent;}
+
+/* toolbar */
+.toolbar{background:#f8fafc;border-top:1px solid var(--border);padding:10px 16px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.btn-export{background:#16a34a;color:#fff;border:none;border-radius:7px;padding:7px 18px;font-weight:700;font-size:.82rem;cursor:pointer;transition:.2s;}
+.btn-export:hover{background:#15803d;}
+.btn-pdf{background:#dc2626;color:#fff;border:none;border-radius:7px;padding:7px 18px;font-weight:700;font-size:.82rem;cursor:pointer;transition:.2s;}
+.btn-pdf:hover{background:#b91c1c;}
+.btn-reset{background:transparent;color:#64748b;border:1.5px solid var(--border);border-radius:7px;padding:7px 14px;font-size:.82rem;cursor:pointer;}
+.btn-save{background:#7c3aed;color:#fff;border:none;border-radius:7px;padding:7px 18px;font-weight:700;font-size:.82rem;cursor:pointer;}
+.saved-card{background:#fff;border-radius:10px;padding:10px 12px;margin-bottom:8px;box-shadow:0 1px 6px rgba(0,0,0,.07);display:flex;gap:10px;align-items:flex-start;}
+.saved-thumb{width:56px;height:56px;border-radius:6px;object-fit:contain;border:1px solid #e2e8f0;background:#f8fafc;flex-shrink:0;}
+.saved-thumb-placeholder{width:56px;height:56px;border-radius:6px;background:#f1f5f9;border:1px dashed #cbd5e1;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:1.4rem;flex-shrink:0;}
+.saved-info{flex:1;min-width:0;}
+.saved-name{font-weight:700;font-size:.83rem;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.saved-sub{font-size:.72rem;color:#64748b;margin-top:2px;}
+.saved-actions{display:flex;gap:5px;margin-top:6px;}
+.btn-load{background:var(--blue-acc);color:#fff;border:none;border-radius:5px;padding:3px 11px;font-size:.74rem;font-weight:600;cursor:pointer;}
+.btn-del{background:transparent;color:#ef4444;border:1.5px solid #fca5a5;border-radius:5px;padding:3px 9px;font-size:.74rem;cursor:pointer;}
+#error-section{background:#fff;border:1.5px solid #fca5a5;border-radius:12px;padding:24px;color:var(--red);text-align:center;}
+#empty-hint{color:#94a3b8;text-align:center;padding:48px 20px;}
+.badge-beta{font-size:.62rem;background:var(--blue-acc);padding:2px 7px;border-radius:20px;}
+.badge-mock{font-size:.62rem;background:#f59e0b;color:#fff;padding:2px 7px;border-radius:20px;display:none;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a href="/pcn-forms/" class="btn btn-sm"
+     style="background:rgba(255,255,255,.15);color:#fff;border:1.5px solid rgba(255,255,255,.35);border-radius:20px;padding:4px 14px;font-size:.8rem;white-space:nowrap;text-decoration:none">
+    <i class="bi bi-arrow-left me-1"></i>返回 PCN/ECN 系統
+  </a>
+  <i class="bi bi-clipboard2-check ms-2" style="font-size:1.3rem"></i>
+  <h1>進料檢驗表</h1>
+  <span class="badge-beta">AI VISION</span>
+  <span class="badge-mock" id="mock-badge">MOCK 範例</span>
+  <button class="ms-auto btn btn-sm" id="saved-list-btn"
+    style="background:rgba(255,255,255,.15);color:#fff;border:1.5px solid rgba(255,255,255,.35);border-radius:20px;padding:4px 14px;font-size:.8rem;white-space:nowrap"
+    onclick="openSavedList()">
+    <i class="bi bi-archive me-1"></i>已儲存 <span id="saved-count-badge" style="background:var(--blue-acc);border-radius:10px;padding:1px 7px;font-size:.75rem">0</span>
+  </button>
+  <span class="ms-2" style="font-size:.78rem;color:rgba(255,255,255,.75)">
+    <i class="bi bi-person-circle me-1"></i>{{ user.display_name }}
+  </span>
+</div>
+
+<div class="container-fluid px-3 py-3" style="max-width:1600px">
+<div class="row g-3">
+
+  <!-- ── 左欄：上傳 ── -->
+  <div class="col-lg-3 col-md-4">
+    <div class="upload-card">
+      <h6 class="text-muted mb-3" style="font-size:.82rem"><i class="bi bi-upload me-1"></i>上傳圖面</h6>
+      <div id="drop-zone">
+        <div class="icon"><i class="bi bi-file-earmark-image"></i></div>
+        <p>拖曳圖面到此處</p>
+        <p class="mt-1"><strong>點擊選擇檔案</strong></p>
+        <p class="mt-2" style="font-size:.72rem;color:#94a3b8">PNG · JPG · PDF</p>
+      </div>
+      <input type="file" id="file-input" accept=".png,.jpg,.jpeg,.pdf,.webp" style="display:none">
+      <div class="thumb-wrap" id="thumb-wrap">
+        <img id="thumb-img" src="" alt="">
+        <div id="file-info"></div>
+      </div>
+      <div id="pdf-options" style="display:none" class="mt-2">
+        <div class="d-flex align-items-center gap-2 p-2 rounded" style="background:#f1f5f9;font-size:.78rem">
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" id="all-pages-toggle">
+            <label class="form-check-label" for="all-pages-toggle">整合全頁</label>
+          </div>
+          <span>頁：</span>
+          <input type="number" id="page-input" value="1" min="1"
+            style="width:44px;border:1px solid #cbd5e1;border-radius:4px;padding:1px 4px;font-size:.78rem">
+        </div>
+      </div>
+      <button id="analyze-btn" class="btn btn-primary mt-3" disabled>
+        <i class="bi bi-cpu me-1"></i>開始視覺分析
+      </button>
+      <button id="mock-btn" class="mt-2" onclick="loadMock()">
+        <i class="bi bi-layout-text-window me-1"></i>載入範例版型
+      </button>
+      <hr class="my-3">
+      <div style="font-size:.72rem;color:#94a3b8;line-height:1.7">
+        <b>量測工具代碼</b><br>
+        <b>V</b> 卡尺 &nbsp;<b>C</b> CCD &nbsp;<b>P</b> 厚薄規 &nbsp;<b>J</b> 檢具<br>
+        <b>T</b> 三次元 &nbsp;<b>H</b> 高度規 &nbsp;<b>M</b> 顯微鏡
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 右欄：結果 ── -->
+  <div class="col-lg-9 col-md-8">
+
+    <div id="empty-hint">
+      <i class="bi bi-arrow-left-circle" style="font-size:2rem"></i>
+      <p class="mt-3">上傳圖面後點擊「開始視覺分析」</p>
+      <p style="font-size:.8rem">或點「載入範例版型」預覽排版</p>
+    </div>
+
+    <div id="loading-section">
+      <div class="spinner-ring"></div>
+      <p class="loading-text">AI 正在識別圖面尺寸<span class="loading-dots"></span></p>
+      <p class="loading-text" style="font-size:.75rem;margin-top:4px;color:#94a3b8">使用 Claude Vision 分析中</p>
+    </div>
+
+    <div id="error-section">
+      <i class="bi bi-exclamation-triangle-fill" style="font-size:2rem;color:#ef4444"></i>
+      <p id="error-msg" class="mt-2 mb-1" style="font-weight:600"></p>
+      <p style="font-size:.8rem;color:#94a3b8;margin:0">餘額不足請前往
+        <a href="https://console.anthropic.com/settings/billing" target="_blank">console.anthropic.com</a> 充值
+      </p>
+      <button class="btn-reset mt-3" onclick="showSection('empty-hint');analyzeBtn.disabled=!!(!selectedFile)">
+        <i class="bi bi-arrow-counterclockwise me-1"></i>重試
+      </button>
+    </div>
+
+    <div id="result-section">
+
+      <!-- 0 項警告 -->
+      <div id="zero-warn" style="display:none;background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:10px 16px;margin-bottom:10px;font-size:.82rem;color:#92400e">
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        <span id="zero-warn-msg">AI 未識別到任何尺寸，請確認圖面是否清晰，或重新上傳。</span>
+      </div>
+
+      <!-- 圖面預覽 -->
+      <div class="drawing-panel" id="drawing-panel">
+        <div class="drawing-panel-header">
+          <span><i class="bi bi-image me-1"></i>圖面預覽
+            <span id="yellow-mark-badge" style="display:none;margin-left:8px;font-size:.68rem;background:#f59e0b;color:#fff;border-radius:10px;padding:2px 8px">★ 標記尺寸</span>
+            <span id="all-dim-badge" style="display:none;margin-left:8px;font-size:.68rem;background:#64748b;color:#fff;border-radius:10px;padding:2px 8px">全部尺寸</span>
+          </span>
+          <button class="btn-toggle" onclick="toggleDrawing()" id="toggle-btn">收合 ▲</button>
+        </div>
+        <div id="drawing-body">
+          <img id="drawing-img" src="" alt="drawing">
+        </div>
+      </div>
+
+      <!-- 統計列 -->
+      <div class="stat-bar">
+        <span><span class="stat-dot" style="background:#64748b"></span>共 <strong id="stat-total">0</strong> 項</span>
+        <span><span class="stat-dot" style="background:var(--green)"></span>OK <strong id="stat-pass">0</strong></span>
+        <span><span class="stat-dot" style="background:var(--red)"></span>NG <strong id="stat-fail">0</strong></span>
+        <span><span class="stat-dot" style="background:var(--yellow)"></span>待量測 <strong id="stat-pending">0</strong></span>
+      </div>
+
+      <!-- 進料檢驗表主體 -->
+      <div class="form-card">
+
+        <!-- 基本資訊 -->
+        <div class="form-title-bar"><i class="bi bi-info-circle me-1"></i>基本資訊</div>
+        <div class="info-grid" style="grid-template-columns:repeat(4,1fr)">
+          <div class="info-cell">
+            <span class="info-label">進料日期</span>
+            <div class="info-val"><input type="date" id="f-date-in"></div>
+          </div>
+          <div class="info-cell">
+            <span class="info-label">品名</span>
+            <div class="info-val"><input type="text" id="res-part" placeholder="（AI自動填入）"></div>
+          </div>
+          <div class="info-cell">
+            <span class="info-label">廠商</span>
+            <div class="info-val"><input type="text" id="f-vendor" placeholder="請輸入"></div>
+          </div>
+          <div class="info-cell">
+            <span class="info-label">進料數量</span>
+            <div class="info-val"><input type="number" id="f-qty" placeholder="0" style="width:70px"> <span style="font-size:.72rem;color:#64748b;margin-left:2px">PCS</span></div>
+          </div>
+          <div class="info-cell">
+            <span class="info-label">檢驗日期</span>
+            <div class="info-val"><input type="date" id="res-date-input"></div>
+          </div>
+          <div class="info-cell">
+            <span class="info-label">品名規格</span>
+            <div class="info-val"><input type="text" id="f-spec" placeholder="請輸入"></div>
+          </div>
+          <div class="info-cell">
+            <span class="info-label">進貨驗收單/單號</span>
+            <div class="info-val"><input type="text" id="f-receipt" placeholder="請輸入"></div>
+          </div>
+          <div class="info-cell">
+            <span class="info-label">進料分類</span>
+            <div class="info-val" style="gap:8px;flex-wrap:wrap">
+              <label style="font-size:.78rem;cursor:pointer"><input type="radio" name="f-class" value="新品" style="margin-right:2px">新品</label>
+              <label style="font-size:.78rem;cursor:pointer"><input type="radio" name="f-class" value="舊工品" style="margin-right:2px">舊工品</label>
+            </div>
+          </div>
+        </div>
+
+        <!-- 外觀檢驗 -->
+        <div class="form-title-bar mt-0 border-top border-secondary-subtle"><i class="bi bi-eye me-1"></i>外觀檢驗</div>
+        <div style="padding:0">
+          <table class="appear-table">
+            <thead>
+              <tr>
+                <th style="width:80px">判定</th>
+                <th>正面</th><th>背面</th><th>左側</th><th>右側</th><th>切削</th><th>油漬</th><th>比對樣品</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="font-size:.72rem;color:#475569">OK(V)／NG(X)</td>
+                <td><input type="text" id="app-front" placeholder="V"></td>
+                <td><input type="text" id="app-back" placeholder="V"></td>
+                <td><input type="text" id="app-left" placeholder="V"></td>
+                <td><input type="text" id="app-right" placeholder="V"></td>
+                <td><input type="text" id="app-cut" placeholder="V"></td>
+                <td><input type="text" id="app-stain" placeholder="V"></td>
+                <td><input type="text" id="app-ref" placeholder="V"></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 尺寸檢驗 -->
+        <div class="form-title-bar border-top border-secondary-subtle"><i class="bi bi-rulers me-1"></i>尺寸檢驗（Unit：mm）</div>
+        <div style="overflow-x:auto">
+          <table class="check-table">
+            <thead>
+              <tr>
+                <th rowspan="2" style="width:30px">編號</th>
+                <th rowspan="2" style="min-width:120px">尺寸</th>
+                <th rowspan="2" style="width:68px">中值</th>
+                <th colspan="2">公差</th>
+                <th rowspan="2" style="width:78px">工具</th>
+                <th colspan="10">量測結果（樣品）</th>
+                <th rowspan="2">判定</th>
+                <th rowspan="2" style="width:22px"></th>
+              </tr>
+              <tr>
+                <th>+</th><th>−</th>
+                <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th>
+                <th>6</th><th>7</th><th>8</th><th>9</th><th>10</th>
+              </tr>
+            </thead>
+            <tbody id="table-body"></tbody>
+          </table>
+        </div>
+        <div style="padding:6px 10px;border-top:1px solid var(--border)">
+          <button onclick="addRow()" id="add-row-btn"
+            style="background:#0891b2;color:#fff;border:none;border-radius:6px;padding:5px 14px;font-weight:700;font-size:.8rem;cursor:pointer">
+            <i class="bi bi-plus-lg me-1"></i>新增量測項目
+          </button>
+        </div>
+
+        <!-- 檢具或實配檢驗 -->
+        <div class="form-title-bar border-top border-secondary-subtle"><i class="bi bi-tools me-1"></i>檢具或實配檢驗</div>
+        <div>
+          <table class="jig-table">
+            <thead>
+              <tr>
+                <th style="width:80px">判定</th>
+                <th>說明</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="font-size:.72rem;color:#475569">OK(V)／NG(X)</td>
+                <td><input type="text" id="jig-result" placeholder="請輸入檢具檢驗結果" style="width:100%;border:none;outline:none;font-size:.78rem"></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- 異常原因 + 綜合判定 -->
+        <div class="bottom-area" style="border-top:1px solid var(--border)">
+          <div class="bottom-cell" style="border-right:1px solid var(--border)">
+            <div class="bottom-label">異常原因：</div>
+            <textarea id="f-abnormal" placeholder="如有異常請填寫原因…"></textarea>
+          </div>
+          <div class="bottom-cell">
+            <div class="bottom-label">綜合判定：</div>
+            <textarea id="f-verdict" placeholder="填寫整體判定結論…"></textarea>
+          </div>
+        </div>
+
+        <!-- 備註 / 量測工具 / 檢驗標準 -->
+        <div class="remark-grid" style="border-top:1px solid var(--border)">
+          <div class="remark-cell">
+            <div class="bottom-label" style="font-size:.72rem;font-weight:700;color:#1a3d5c">備　注：</div>
+            <textarea id="res-remark" placeholder="備注…"></textarea>
+          </div>
+          <div class="remark-cell" style="border-right:none">
+            <div class="bottom-label" style="font-size:.72rem;font-weight:700;color:#1a3d5c">量測工具：</div>
+            <textarea id="f-tools" placeholder="V:卡尺  C:CCD  P:厚薄規  J:檢具  T:三次元  H:高度規  M:顯微鏡"></textarea>
+          </div>
+        </div>
+
+        <!-- 簽核 + 表單號 -->
+        <div class="sign-row">
+          <div class="sign-cell"><span style="font-size:.78rem;font-weight:700;color:#1a3d5c;white-space:nowrap">核　准：</span><input type="text" id="sign-approve" placeholder=""></div>
+          <div class="sign-cell"><span style="font-size:.78rem;font-weight:700;color:#1a3d5c;white-space:nowrap">管　理：</span><input type="text" id="res-inspector" placeholder="量測人員"></div>
+          <div class="sign-cell"><span style="font-size:.78rem;font-weight:700;color:#1a3d5c;white-space:nowrap">制　定：</span><input type="text" id="sign-made" placeholder=""><span style="margin-left:auto;font-size:.68rem;color:#94a3b8">F0806-12_V3</span></div>
+        </div>
+
+        <!-- 工具列 -->
+        <div class="toolbar">
+          <button class="btn-export" onclick="exportExcel()">
+            <i class="bi bi-file-earmark-excel me-1"></i>匯出 Excel
+          </button>
+          <button class="btn-pdf" onclick="exportPDF()">
+            <i class="bi bi-file-earmark-pdf me-1"></i>匯出 PDF
+          </button>
+          <button class="btn-save" onclick="saveChecklist()">
+            <i class="bi bi-archive me-1"></i>儲存檢表
+          </button>
+          <button class="btn-reset" onclick="resetAll()">
+            <i class="bi bi-arrow-counterclockwise me-1"></i>重新上傳
+          </button>
+          <span style="font-size:.72rem;color:#94a3b8;margin-left:auto">超出公差欄位自動標紅 · 判定自動計算</span>
+        </div>
+      </div>
+
+    </div><!-- /result-section -->
+  </div>
+</div>
+</div>
+
+<!-- Offcanvas 儲存清單 -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="savedOffcanvas" style="width:360px">
+  <div class="offcanvas-header" style="background:var(--blue-dark);color:#fff;padding:14px 18px">
+    <h6 class="offcanvas-title mb-0"><i class="bi bi-archive me-2"></i>已儲存的檢表</h6>
+    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
+  </div>
+  <div class="offcanvas-body p-0" style="background:#f1f5f9;overflow-y:auto">
+    <div id="saved-list-container" style="padding:10px"></div>
+  </div>
+</div>
+
+<script>
+let currentData = null;
+let selectedFile = null;
+let isMockMode  = false;
+
+const dropZone   = document.getElementById('drop-zone');
+const fileInput  = document.getElementById('file-input');
+const analyzeBtn = document.getElementById('analyze-btn');
+const thumbWrap  = document.getElementById('thumb-wrap');
+const thumbImg   = document.getElementById('thumb-img');
+const fileInfo   = document.getElementById('file-info');
+const pdfOptions = document.getElementById('pdf-options');
+const allToggle  = document.getElementById('all-pages-toggle');
+const pageInput  = document.getElementById('page-input');
+const mockBadge  = document.getElementById('mock-badge');
+
+// 預設今天日期
+const today = new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit'});
+const todayISO = new Date().toISOString().slice(0,10);
+document.getElementById('res-date-input').value = todayISO;
+
+// ── Mock 範例 ───────────────────────────────────────
+const MOCK_DATA = {
+  part_name:"A14 GAMEING M-HS（廠矩）", drawing_no:"RS40-FRONT-001",
+  has_yellow_marks:false, preview:null,
+  dimensions:[
+    {item_no:1, name:"焊腳寬（左）",   nominal:"0.5",  unit:"mm", upper_tol:0.1,  lower_tol:-0.1, note:"正視圖"},
+    {item_no:2, name:"焊腳寬（右）",   nominal:"0.5",  unit:"mm", upper_tol:0.1,  lower_tol:-0.1, note:"正視圖"},
+    {item_no:3, name:"焊腳寬（底）",   nominal:"0.5",  unit:"mm", upper_tol:0.1,  lower_tol:-0.1, note:"底視圖"},
+    {item_no:4, name:"板厚 thickness", nominal:"0.3",  unit:"mm", upper_tol:0.05, lower_tol:-0.05,note:"正視圖"},
+    {item_no:5, name:"整體寬",         nominal:"7.9",  unit:"mm", upper_tol:0.15, lower_tol:-0.15,note:"正視圖"},
+    {item_no:6, name:"頂部高",         nominal:"5.16", unit:"mm", upper_tol:null, lower_tol:null, note:"正視圖"},
+    {item_no:7, name:"腳間距（左）",   nominal:"1.8",  unit:"mm", upper_tol:0.1,  lower_tol:-0.1, note:"正視圖"},
+    {item_no:8, name:"腳間距（右）",   nominal:"1.8",  unit:"mm", upper_tol:0.1,  lower_tol:-0.1, note:"正視圖"},
+    {item_no:9, name:"角度 90°",       nominal:"90",   unit:"°",  upper_tol:2,    lower_tol:-2,   note:"正視圖"},
+    {item_no:10,name:"整體長度",        nominal:"18.82",unit:"mm", upper_tol:0.35, lower_tol:-0.35,note:"底視圖"},
+    {item_no:11,name:"PCB接觸面高",     nominal:"2.7",  unit:"mm", upper_tol:0.1,  lower_tol:-0.1, note:"側視圖"},
+    {item_no:12,name:"頂部寬度",        nominal:"10.31",unit:"mm", upper_tol:null, lower_tol:null, note:"正視圖"},
+  ]
+};
+
+function loadMock() {
+  isMockMode = true; mockBadge.style.display='inline';
+  currentData = MOCK_DATA;
+  document.getElementById('res-part').value  = MOCK_DATA.part_name;
+  document.getElementById('f-spec').value    = MOCK_DATA.part_name;
+  renderResult(MOCK_DATA);
+}
+
+// ── 上傳 ────────────────────────────────────────────
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+fileInput.addEventListener('change', () => { if(fileInput.files[0]) handleFile(fileInput.files[0]); });
+allToggle.addEventListener('change', () => { document.getElementById('page-input').parentElement.style.display = allToggle.checked ? 'none' : ''; });
+
+function handleFile(file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (!['png','jpg','jpeg','pdf','webp','gif'].includes(ext)) return alert('不支援格式');
+  selectedFile = file; isMockMode = false; mockBadge.style.display = 'none';
+  pdfOptions.style.display = ext === 'pdf' ? 'block' : 'none';
+  if (ext !== 'pdf') {
+    const reader = new FileReader();
+    reader.onload = e => { thumbImg.src = e.target.result; };
+    reader.readAsDataURL(file);
+  } else {
+    thumbImg.src = ''; thumbWrap.style.display = 'block';
+    fileInfo.textContent = `${file.name} · 載入預覽中…`;
+    const fd2 = new FormData(); fd2.append('file', file);
+    fetch('/drawing-checker/api/thumbnail', {method:'POST',body:fd2})
+      .then(r=>r.json()).then(d=>{if(d.thumbnail){thumbImg.src=d.thumbnail;fileInfo.textContent=`${file.name} · ${(file.size/1024).toFixed(0)} KB`;}}).catch(()=>{});
+  }
+  thumbWrap.style.display = 'block';
+  fileInfo.textContent = `${file.name}  ·  ${(file.size/1024).toFixed(0)} KB`;
+  analyzeBtn.disabled = false;
+  showSection('empty-hint');
+}
+
+// ── 分析 ────────────────────────────────────────────
+analyzeBtn.addEventListener('click', async () => {
+  if (!selectedFile) return;
+  showSection('loading-section'); analyzeBtn.disabled = true;
+  const fd = new FormData(); fd.append('file', selectedFile); fd.append('all_pages', allToggle.checked); fd.append('page', pageInput.value||1);
+  try {
+    const resp = await fetch('/drawing-checker/api/analyze', {method:'POST',body:fd});
+    let data; try { data = await resp.json(); } catch { data={detail:`伺服器錯誤 (HTTP ${resp.status})`}; }
+    if (!resp.ok) { showError(data.detail || `分析失敗 (${resp.status})`); return; }
+    currentData = data; renderResult(data);
+    if (data._warn) { document.getElementById('zero-warn-msg').textContent=data._warn; document.getElementById('zero-warn').style.display='block'; }
+  } catch(err) { showError('網路錯誤：'+err.message); }
+  finally { analyzeBtn.disabled = false; }
+});
+
+// ── 渲染結果 ─────────────────────────────────────────
+function renderResult(data) {
+  const yellowBadge = document.getElementById('yellow-mark-badge');
+  const allBadge    = document.getElementById('all-dim-badge');
+  if (data.has_yellow_marks) { yellowBadge.style.display='inline'; allBadge.style.display='none'; }
+  else { yellowBadge.style.display='none'; allBadge.style.display='inline'; }
+
+  const drawImg   = document.getElementById('drawing-img');
+  const drawPanel = document.getElementById('drawing-panel');
+  if (data.preview) { drawImg.src=data.preview; drawPanel.style.display='block'; }
+  else if (thumbImg.src && thumbImg.src !== window.location.href) { drawImg.src=thumbImg.src; drawPanel.style.display='block'; }
+  else { drawPanel.style.display='none'; }
+
+  document.getElementById('res-part').value = data.part_name || '';
+
+  const dims = data.dimensions || [];
+  renderTable(dims);
+
+  const zeroWarn = document.getElementById('zero-warn');
+  if (dims.length===0) {
+    document.getElementById('zero-warn-msg').textContent='AI 未識別到任何尺寸，建議：① 確認圖面清晰度 ② 重新上傳';
+    zeroWarn.style.display='block';
+  } else { zeroWarn.style.display='none'; }
+
+  showSection('result-section');
+}
+
+let nextRowIdx = 0, extraRowCount = 0;
+const MAX_EXTRA = 15;
+
+function renderTable(dims) {
+  const tbody = document.getElementById('table-body');
+  tbody.innerHTML = ''; nextRowIdx = dims.length; extraRowCount = 0;
+  document.getElementById('stat-total').textContent   = dims.length;
+  document.getElementById('stat-pass').textContent    = 0;
+  document.getElementById('stat-fail').textContent    = 0;
+  document.getElementById('stat-pending').textContent = dims.length;
+
+  dims.forEach((dim, idx) => {
+    const nomVal = parseFloat(dim.nominal);
+    const utol   = dim.upper_tol != null ? parseFloat(dim.upper_tol) : null;
+    const ltol   = dim.lower_tol != null ? parseFloat(dim.lower_tol) : null;
+    const upper  = (isFinite(nomVal) && utol != null) ? nomVal + utol : null;
+    const lower  = (isFinite(nomVal) && ltol != null) ? nomVal + ltol : null;
+    const unit   = dim.unit || 'mm';
+    const nomDisplay = dim.nominal != null ? `${dim.nominal}<small style="color:#94a3b8;font-size:.68em"> ${unit}</small>` : '—';
+    const tr = document.createElement('tr');
+    tr.dataset.idx = idx; tr.dataset.nominal = dim.nominal ?? ''; tr.dataset.unit = unit;
+    const measCells = [1,2,3,4,5,6,7,8,9,10].map(n => `
+      <td><input type="number" step="any" class="meas-input"
+        data-row="${idx}" data-col="${n}"
+        data-upper="${upper??''}" data-lower="${lower??''}"
+        placeholder="—" oninput="onInput(this)"></td>`).join('');
+    tr.innerHTML = `
+      <td>${dim.item_no ?? idx+1}</td>
+      <td class="name-col" title="${dim.note||''}">${dim.name||''}</td>
+      <td><input type="number" step="any" class="nom-input" value="${dim.nominal??''}" placeholder="—" data-row="${idx}" oninput="onNomInput(this)"><small style="color:#94a3b8;font-size:.62rem"> ${unit}</small></td>
+      <td><input type="number" step="any" class="tol-input tol-pos" data-row="${idx}" data-sign="upper" value="${utol!=null?utol:''}" placeholder="—" oninput="onTolInput(this)"></td>
+      <td><input type="number" step="any" class="tol-input tol-neg" data-row="${idx}" data-sign="lower" value="${ltol!=null?ltol:''}" placeholder="—" oninput="onTolInput(this)" onblur="if(parseFloat(this.value)>0){this.value='-'+parseFloat(this.value);onTolInput(this);}"></td>
+      <td><select class="tool-select" data-row="${idx}">
+        <option value="">—</option>
+        <option value="V">V 卡尺</option><option value="C">C CCD</option>
+        <option value="P">P 厚薄規</option><option value="J">J 檢具</option>
+        <option value="T">T 三次元</option><option value="H">H 高度規</option>
+        <option value="M">M 顯微鏡</option>
+      </select></td>
+      ${measCells}
+      <td id="verdict-${idx}"><span class="badge-pending">待量測</span></td>
+      <td><button class="btn-del-row" onclick="deleteRow(this)" title="刪除">✕</button></td>`;
+    tbody.appendChild(tr);
+  });
+  updateStats();
+}
+
+function _getBounds(row, tr) {
+  const nomStr = tr?.dataset.nominal || tr?.querySelector('.nom-input')?.value || '';
+  const nom    = nomStr !== '' ? parseFloat(nomStr) : null;
+  const uInp   = document.querySelector(`.tol-input[data-row="${row}"][data-sign="upper"]`);
+  const lInp   = document.querySelector(`.tol-input[data-row="${row}"][data-sign="lower"]`);
+  const utol   = uInp?.value.trim() !== '' ? parseFloat(uInp.value) : null;
+  const ltolR  = lInp?.value.trim() !== '' ? parseFloat(lInp.value) : null;
+  const ltol   = ltolR != null ? -Math.abs(ltolR) : null;
+  return { upper:(nom!=null&&utol!=null)?nom+utol:null, lower:(nom!=null&&ltol!=null)?nom+ltol:null };
+}
+
+function onNomInput(inp) {
+  const tr = inp.closest('tr');
+  tr.dataset.nominal = inp.value;
+  const row = parseInt(inp.dataset.row);
+  document.querySelectorAll(`.meas-input[data-row="${row}"]`).forEach(m => {
+    m.classList.remove('ok','out');
+    if (m.value.trim() !== '') _applyColor(m);
+  });
+  updateRowVerdict(row); updateStats();
+}
+
+function onTolInput(inp) {
+  if (!inp) return;
+  const row = parseInt(inp.dataset.row);
+  document.querySelectorAll(`.meas-input[data-row="${row}"]`).forEach(mi => {
+    mi.classList.remove('out','ok'); if(mi.value.trim()!=='') _applyColor(mi);
+  });
+  updateRowVerdict(row); updateStats();
+}
+
+document.addEventListener('keydown', function(e) {
+  const inp = e.target;
+  if (!inp.classList.contains('meas-input') && !inp.classList.contains('tol-input')) return;
+  if (e.key==='ArrowUp'||e.key==='ArrowDown') { e.preventDefault(); return; }
+  if (e.key==='Enter') {
+    e.preventDefault();
+    const all = [...document.querySelectorAll('#table-body .meas-input')];
+    const idx = all.indexOf(inp);
+    if (idx!==-1 && idx<all.length-1) { all[idx+1].focus(); all[idx+1].select(); }
+  }
+}, true);
+
+function _applyColor(inp) {
+  const row = parseInt(inp.dataset.row);
+  const tr  = inp.closest('tr');
+  const {upper, lower} = _getBounds(row, tr);
+  const val = inp.value.trim()!=='' ? parseFloat(inp.value) : null;
+  inp.classList.remove('out','ok');
+  if (val!==null && upper!==null && lower!==null)
+    inp.classList.add(val>upper||val<lower?'out':'ok');
+}
+
+function onInput(inp) { _applyColor(inp); updateRowVerdict(parseInt(inp.dataset.row)); updateStats(); }
+
+function updateRowVerdict(idx) {
+  const inputs = document.querySelectorAll(`.meas-input[data-row="${idx}"]`);
+  const cell   = document.getElementById(`verdict-${idx}`);
+  if (!cell) return;
+  const filled = [...inputs].filter(i => i.value.trim()!=='');
+  if (!filled.length) { cell.innerHTML='<span class="badge-pending">待量測</span>'; return; }
+  const tr = inputs[0]?.closest('tr');
+  const {upper, lower} = _getBounds(idx, tr);
+  if (upper!==null && lower!==null) {
+    const ng = filled.some(i => { const v=parseFloat(i.value); return isNaN(v)||v>upper||v<lower; });
+    cell.innerHTML = ng ? '<span class="badge-fail">✕ NG</span>' : '<span class="badge-pass">✓ OK</span>';
+  } else { cell.innerHTML='<span class="badge-pending">已填入</span>'; }
+}
+
+function updateStats() {
+  let pass=0, fail=0, pending=0;
+  document.querySelectorAll('#table-body tr').forEach(tr => {
+    const b = tr.querySelector('[class^="badge-"]');
+    if (!b) return;
+    if (b.classList.contains('badge-pass')) pass++;
+    else if (b.classList.contains('badge-fail')) fail++;
+    else pending++;
+  });
+  document.getElementById('stat-pass').textContent    = pass;
+  document.getElementById('stat-fail').textContent    = fail;
+  document.getElementById('stat-pending').textContent = pending;
+  document.getElementById('stat-total').textContent   = pass+fail+pending;
+}
+
+function addRow() {
+  if (extraRowCount >= MAX_EXTRA) { alert(`最多只能新增 ${MAX_EXTRA} 列`); return; }
+  extraRowCount++;
+  const dataRow = nextRowIdx++;
+  const tbody   = document.getElementById('table-body');
+  const rowNo   = tbody.querySelectorAll('tr').length + 1;
+  const measCells = [1,2,3,4,5,6,7,8,9,10].map(n => `
+    <td><input type="number" step="any" class="meas-input"
+      data-row="${dataRow}" data-col="${n}" data-upper="" data-lower=""
+      placeholder="—" oninput="onInput(this)"></td>`).join('');
+  const tr = document.createElement('tr');
+  tr.dataset.idx = dataRow; tr.dataset.manual = '1'; tr.dataset.nominal = ''; tr.dataset.unit = 'mm';
+  tr.innerHTML = `
+    <td>${rowNo}</td>
+    <td class="name-col"><input type="text" class="name-input" placeholder="輸入量測項目"></td>
+    <td><input type="number" step="any" class="nom-input" data-row="${dataRow}" placeholder="—" oninput="onNomInput(this)"></td>
+    <td><input type="number" step="any" class="tol-input tol-pos" data-row="${dataRow}" data-sign="upper" value="" placeholder="—" oninput="onTolInput(this)"></td>
+    <td><input type="number" step="any" class="tol-input tol-neg" data-row="${dataRow}" data-sign="lower" value="" placeholder="—" oninput="onTolInput(this)" onblur="if(parseFloat(this.value)>0){this.value='-'+parseFloat(this.value);onTolInput(this);}"></td>
+    <td><select class="tool-select" data-row="${dataRow}">
+      <option value="">—</option><option value="V">V 卡尺</option><option value="C">C CCD</option>
+      <option value="P">P 厚薄規</option><option value="J">J 檢具</option>
+      <option value="T">T 三次元</option><option value="H">H 高度規</option><option value="M">M 顯微鏡</option>
+    </select></td>
+    ${measCells}
+    <td id="verdict-${dataRow}"><span class="badge-pending">待量測</span></td>
+    <td><button class="btn-del-row" onclick="deleteRow(this)" title="刪除">✕</button></td>`;
+  tbody.appendChild(tr);
+  updateStats();
+}
+
+function deleteRow(btn) {
+  const tr = btn.closest('tr');
+  if (tr.dataset.manual) extraRowCount--;
+  tr.remove();
+  document.querySelectorAll('#table-body tr').forEach((row,i) => { row.cells[0].textContent = i+1; });
+  updateStats();
+}
+
+function collectTableRows() {
+  const rows = [];
+  document.querySelectorAll('#table-body tr').forEach((tr, visIdx) => {
+    const nameCell = tr.querySelector('td.name-col');
+    const name     = nameCell?.querySelector('.name-input')?.value || nameCell?.textContent?.trim() || '';
+    const nominal  = tr.querySelector('.nom-input')?.value.trim() || tr.dataset.nominal || '';
+    const unit     = tr.dataset.unit    || 'mm';
+    const uInp     = tr.querySelector('.tol-input[data-sign="upper"]');
+    const lInp     = tr.querySelector('.tol-input[data-sign="lower"]');
+    const utol     = uInp?.value.trim()!=='' ? parseFloat(uInp.value) : null;
+    const ltolRaw  = lInp?.value.trim()!=='' ? parseFloat(lInp.value) : null;
+    const ltol     = ltolRaw!=null ? -Math.abs(ltolRaw) : null;
+    const tool     = tr.querySelector('.tool-select')?.value || '';
+    const meas     = [1,2,3,4,5,6,7,8,9,10].map(n => {
+      const v = tr.querySelector(`.meas-input[data-col="${n}"]`)?.value.trim();
+      return v!==''&&v!=null ? v : '';
+    });
+    const verdict  = tr.querySelector('[class^="badge-"]')?.textContent.trim() || '';
+    rows.push({no:visIdx+1, name, nominal, unit, utol, ltol, tool, meas, verdict});
+  });
+  return rows;
+}
+
+// ── 顯示切換 ─────────────────────────────────────────
+function showSection(id) {
+  ['empty-hint','loading-section','error-section','result-section'].forEach(s => {
+    document.getElementById(s).style.display = s===id ? 'block' : 'none';
+  });
+}
+function showError(msg) { document.getElementById('error-msg').textContent=msg; showSection('error-section'); }
+function toggleDrawing() {
+  const body=document.getElementById('drawing-body'), btn=document.getElementById('toggle-btn');
+  const hidden = body.style.display==='none';
+  body.style.display = hidden?'block':'none';
+  btn.textContent = hidden?'收合 ▲':'展開 ▼';
+}
+
+// ── 匯出 Excel ────────────────────────────────────────
+function exportExcel() {
+  if (!currentData) return;
+  const part     = document.getElementById('res-part').value || '';
+  const spec     = document.getElementById('f-spec').value || '';
+  const vendor   = document.getElementById('f-vendor').value || '';
+  const qty      = document.getElementById('f-qty').value || '';
+  const dateIn   = document.getElementById('f-date-in').value || '';
+  const dateChk  = document.getElementById('res-date-input').value || '';
+  const receipt  = document.getElementById('f-receipt').value || '';
+  const fClass   = document.querySelector('input[name="f-class"]:checked')?.value || '';
+  const inspector= document.getElementById('res-inspector').value || '';
+  const approve  = document.getElementById('sign-approve').value || '';
+  const made     = document.getElementById('sign-made').value || '';
+  const remark   = document.getElementById('res-remark').value || '';
+  const abnormal = document.getElementById('f-abnormal').value || '';
+  const verdict  = document.getElementById('f-verdict').value || '';
+  const tools    = document.getElementById('f-tools').value || '';
+  const rows     = collectTableRows();
+
+  const wsData = [
+    ['鴻騰電子股份有限公司', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+    ['進料檢驗表', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+    [],
+    ['進料日期', dateIn, '品名', part, '廠商', vendor, '進料數量', qty, 'PCS', '', '', '', '', '', '', ''],
+    ['檢驗日期', dateChk,'品名規格', spec,'進貨驗收單/單號', receipt,'進料分類', fClass, '', '', '', '', '', '', '', ''],
+    [],
+    ['外觀檢驗', '正面', '背面', '左側', '右側', '切削', '油漬', '比對樣品', '', '', '', '', '', '', '', ''],
+    ['OK(V)/NG(X)',
+      document.getElementById('app-front').value,
+      document.getElementById('app-back').value,
+      document.getElementById('app-left').value,
+      document.getElementById('app-right').value,
+      document.getElementById('app-cut').value,
+      document.getElementById('app-stain').value,
+      document.getElementById('app-ref').value,
+      '', '', '', '', '', '', '', ''],
+    [],
+    ['尺寸檢驗（Unit：mm）', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+    ['編號','尺寸','中值','公差(+)','公差(-)','工具','樣品1','樣品2','樣品3','樣品4','樣品5','樣品6','樣品7','樣品8','樣品9','樣品10','判定'],
+    ...rows.map(r => [
+      r.no, r.name, r.nominal!=null?`${r.nominal} ${r.unit}`:'',
+      r.utol!=null?`+${r.utol}`:'',
+      r.ltol!=null?`${r.ltol}`:'',
+      r.tool,
+      ...r.meas,
+      r.verdict
+    ]),
+    [],
+    ['檢具或實配檢驗', document.getElementById('jig-result').value, '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+    [],
+    ['異常原因', abnormal, '', '', '', '', '', '綜合判定', verdict, '', '', '', '', '', '', ''],
+    [],
+    ['備注', remark, '', '', '', '', '', '量測工具', tools, '', '', '', '', '', '', ''],
+    [],
+    ['核准', approve, '', '', '管理', inspector, '', '', '制定', made, '', '', '', '', 'F0806-12_V3', ''],
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  ws['!cols'] = [
+    {wch:6},{wch:18},{wch:10},{wch:8},{wch:8},{wch:8},
+    {wch:8},{wch:8},{wch:8},{wch:8},{wch:8},
+    {wch:8},{wch:8},{wch:8},{wch:8},{wch:8},{wch:8}
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '進料檢驗表');
+  const ts = new Date().toISOString().slice(0,10).replace(/-/g,'');
+  XLSX.writeFile(wb, `進料檢驗表_${(part||'drawing').replace(/[/\\:*?"<>|]/g,'_')}_${ts}.xlsx`);
+}
+
+// ── 匯出 PDF ─────────────────────────────────────────
+function exportPDF() {
+  if (!currentData) return;
+
+  const part     = document.getElementById('res-part').value || '未命名';
+  const spec     = document.getElementById('f-spec').value || '';
+  const vendor   = document.getElementById('f-vendor').value || '';
+  const qty      = document.getElementById('f-qty').value || '';
+  const dateIn   = document.getElementById('f-date-in').value || '';
+  const dateChk  = document.getElementById('res-date-input').value || '';
+  const receipt  = document.getElementById('f-receipt').value || '';
+  const fClass   = document.querySelector('input[name="f-class"]:checked')?.value || '';
+  const inspector= document.getElementById('res-inspector').value || '';
+  const approve  = document.getElementById('sign-approve').value || '';
+  const made     = document.getElementById('sign-made').value || '';
+  const remark   = document.getElementById('res-remark').value || '';
+  const abnormal = document.getElementById('f-abnormal').value || '';
+  const verdict  = document.getElementById('f-verdict').value || '';
+  const tools    = document.getElementById('f-tools').value || 'V:卡尺  C:CCD  P:厚薄規  J:檢具  T:三次元  H:高度規  M:顯微鏡';
+  const imgSrc   = document.getElementById('drawing-img').src || '';
+
+  const appearRow = ['app-front','app-back','app-left','app-right','app-cut','app-stain','app-ref']
+    .map(id => `<td>${document.getElementById(id).value||''}</td>`).join('');
+  const jigResult = document.getElementById('jig-result').value || '';
+
+  const dimRows = collectTableRows().map(r => {
+    const utolV = r.utol!=null?`+${r.utol}`:'—';
+    const ltolV = r.ltol!=null?`${r.ltol}`:'—';
+    const measTds = r.meas.map(v=>`<td>${v}</td>`).join('');
+    const vStyle = r.verdict.includes('OK')?'color:#15803d;font-weight:800':r.verdict.includes('NG')?'color:#b91c1c;font-weight:800':'color:#92400e';
+    const nomDisplay = r.nominal ? `${r.nominal} ${r.unit}` : '—';
+    return `<tr>
+      <td>${r.no}</td><td style="text-align:left;padding-left:5px">${r.name}</td>
+      <td>${nomDisplay}</td>
+      <td style="color:#059669">${utolV}</td><td style="color:#dc2626">${ltolV}</td>
+      <td>${r.tool}</td>${measTds}<td style="${vStyle}">${r.verdict}</td>
+    </tr>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html>
+<html lang="zh-TW"><head>
+<meta charset="UTF-8">
+<title>進料檢驗表 - ${part}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Microsoft JhengHei","微軟正黑體",Arial,sans-serif;font-size:10px;background:#fff;color:#1e293b;}
+.page{padding:8mm 10mm;}
+/* 公司標頭 */
+.company-header{text-align:center;margin-bottom:4px;}
+.company-header .co-name{font-size:16px;font-weight:800;color:#0d2137;}
+.company-header .co-sub{font-size:8px;color:#64748b;}
+.form-title{text-align:center;font-size:14px;font-weight:800;margin-bottom:6px;border-bottom:2px solid #1a3d5c;padding-bottom:4px;color:#1a3d5c;}
+/* 圖面 */
+.drawing-wrap{border:1px solid #cbd5e1;margin-bottom:8px;overflow:hidden;}
+.drawing-wrap img{width:100%;height:auto;display:block;max-height:220px;object-fit:contain;}
+/* 基本資訊 */
+.info-grid{display:grid;grid-template-columns:repeat(4,1fr);border-left:1px solid #cbd5e1;border-top:1px solid #cbd5e1;margin-bottom:6px;}
+.info-cell{border-right:1px solid #cbd5e1;border-bottom:1px solid #cbd5e1;display:flex;}
+.info-label{background:#e8f0fa;font-size:7.5px;font-weight:700;padding:3px 5px;white-space:nowrap;display:flex;align-items:center;color:#1a3d5c;border-right:1px solid #cbd5e1;}
+.info-val{flex:1;padding:2px 5px;font-size:9px;display:flex;align-items:center;}
+/* 節標題 */
+.sec-title{background:#1a3d5c;color:#fff;font-size:9px;font-weight:700;padding:4px 8px;margin-bottom:0;}
+/* 表格共用 */
+table{width:100%;border-collapse:collapse;}
+th{background:#1a3d5c;color:#fff;text-align:center;padding:4px 2px;border:1px solid #1e4f7a;font-weight:700;font-size:8px;}
+td{border:1px solid #dde5ef;padding:3px 2px;text-align:center;vertical-align:middle;font-size:8.5px;}
+td.tl{text-align:left;padding-left:5px;}
+tr:nth-child(even) td{background:#f7fbff;}
+.sub-th{background:#1a4a72;color:#b8d4ee;font-size:7px;}
+/* 下段 */
+.two-col{display:grid;grid-template-columns:1fr 1fr;border:1px solid #cbd5e1;font-size:9px;}
+.two-cell{padding:5px 8px;border-right:1px solid #cbd5e1;}
+.two-cell:last-child{border-right:none;}
+.cell-label{font-weight:700;color:#1a3d5c;margin-bottom:2px;font-size:8px;}
+.cell-body{min-height:36px;font-size:8.5px;white-space:pre-wrap;}
+/* 簽核 */
+.sign-row{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid #cbd5e1;border-top:none;}
+.sign-cell{padding:5px 8px;border-right:1px solid #cbd5e1;font-size:9px;}
+.sign-cell:last-child{border-right:none;display:flex;justify-content:space-between;}
+.form-no{font-size:7px;color:#94a3b8;align-self:flex-end;}
+@media print{@page{margin:6mm;size:A4 portrait;}body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
+</style>
+</head><body><div class="page">
+
+<div class="company-header">
+  <div class="co-name">鴻騰電子股份有限公司</div>
+  <div class="co-sub">Honten Electronic Inc.</div>
+</div>
+<div class="form-title">進料檢驗表</div>
+
+${imgSrc?`<div class="drawing-wrap"><img src="${imgSrc}" alt="drawing"></div>`:''}
+
+<div class="info-grid">
+  <div class="info-cell"><span class="info-label">進料日期</span><span class="info-val">${dateIn||'&nbsp;&nbsp;/&nbsp;&nbsp;/&nbsp;&nbsp;'}</span></div>
+  <div class="info-cell"><span class="info-label">品名</span><span class="info-val">${part}</span></div>
+  <div class="info-cell"><span class="info-label">廠商</span><span class="info-val">${vendor}</span></div>
+  <div class="info-cell"><span class="info-label">進料數量</span><span class="info-val">${qty} PCS</span></div>
+  <div class="info-cell"><span class="info-label">檢驗日期</span><span class="info-val">${dateChk||'&nbsp;&nbsp;/&nbsp;&nbsp;/&nbsp;&nbsp;'}</span></div>
+  <div class="info-cell"><span class="info-label">品名規格</span><span class="info-val">${spec}</span></div>
+  <div class="info-cell"><span class="info-label">進貨驗收單/單號</span><span class="info-val">${receipt}</span></div>
+  <div class="info-cell"><span class="info-label">進料分類</span><span class="info-val">${fClass||'新品 □ / 舊工品 □'}</span></div>
+</div>
+
+<div class="sec-title">外觀檢驗</div>
+<table style="margin-bottom:6px">
+  <thead><tr><th style="width:60px">判定</th><th>正面</th><th>背面</th><th>左側</th><th>右側</th><th>切削</th><th>油漬</th><th>比對樣品</th></tr></thead>
+  <tbody><tr><td style="font-size:7.5px;color:#475569">OK(V)／NG(X)</td>${appearRow}</tr></tbody>
+</table>
+
+<div class="sec-title">尺寸檢驗（Unit：mm）</div>
+<table style="margin-bottom:6px">
+  <thead>
+    <tr>
+      <th rowspan="2" style="width:22px">編號</th>
+      <th rowspan="2" style="min-width:80px">尺寸</th>
+      <th rowspan="2" style="width:46px">中值</th>
+      <th colspan="2">公差</th>
+      <th rowspan="2" style="width:40px">工具</th>
+      <th colspan="10">量測結果（樣品）</th>
+      <th rowspan="2" style="width:30px">判定</th>
+    </tr>
+    <tr>
+      <th class="sub-th">+</th><th class="sub-th">−</th>
+      <th class="sub-th">1</th><th class="sub-th">2</th><th class="sub-th">3</th>
+      <th class="sub-th">4</th><th class="sub-th">5</th><th class="sub-th">6</th>
+      <th class="sub-th">7</th><th class="sub-th">8</th><th class="sub-th">9</th>
+      <th class="sub-th">10</th>
+    </tr>
+  </thead>
+  <tbody>${dimRows}</tbody>
+</table>
+
+<div class="sec-title">檢具或實配檢驗</div>
+<table style="margin-bottom:6px">
+  <thead><tr><th style="width:60px">判定</th><th>說明</th></tr></thead>
+  <tbody><tr><td style="font-size:7.5px;color:#475569">OK(V)／NG(X)</td><td class="tl">${jigResult}</td></tr></tbody>
+</table>
+
+<div class="two-col">
+  <div class="two-cell"><div class="cell-label">異常原因：</div><div class="cell-body">${abnormal||' '}</div></div>
+  <div class="two-cell"><div class="cell-label">綜合判定：</div><div class="cell-body">${verdict||' '}</div></div>
+</div>
+<div class="two-col" style="border-top:none">
+  <div class="two-cell"><div class="cell-label">備　注：</div><div class="cell-body">${remark||' '}</div></div>
+  <div class="two-cell"><div class="cell-label">量測工具：</div><div class="cell-body">${tools}</div></div>
+</div>
+
+<div class="sign-row">
+  <div class="sign-cell"><b>核　准：</b>${approve}</div>
+  <div class="sign-cell"><b>管　理：</b>${inspector}</div>
+  <div class="sign-cell"><b>制　定：</b>${made}<span class="form-no">F0806-12_V3</span></div>
+</div>
+
+</div>
+<script>window.onload=function(){setTimeout(function(){window.print();},400);};<\/script>
+</body></html>`;
+
+  const w = window.open('','_blank');
+  if (!w) { alert('請允許瀏覽器開啟新分頁'); return; }
+  w.document.write(html); w.document.close();
+}
+
+// ── 重置 ─────────────────────────────────────────────
+function resetAll() {
+  selectedFile=null; currentData=null; isMockMode=false;
+  fileInput.value=''; thumbImg.src='';
+  thumbWrap.style.display='none'; fileInfo.textContent='';
+  pdfOptions.style.display='none'; analyzeBtn.disabled=true;
+  mockBadge.style.display='none';
+  showSection('empty-hint');
+}
+
+// ── 儲存檢表 ─────────────────────────────────────────
+async function saveChecklist() {
+  if (!currentData) return alert('請先分析或載入一份檢表');
+  const part     = document.getElementById('res-part').value.trim() || '未命名';
+  const inspector= document.getElementById('res-inspector').value.trim();
+  const internal = document.getElementById('f-spec').value.trim();
+  const preview  = document.getElementById('drawing-img').src || '';
+  const tools = {};
+  document.querySelectorAll('.tool-select').forEach(sel => { if(sel.value) tools[sel.dataset.row]=sel.value; });
+  const body = {
+    part_name:part, drawing_no:inspector, internal_no:internal,
+    dimensions:currentData.dimensions||[], tools,
+    preview: preview.startsWith('data:') ? preview : '',
+  };
+  try {
+    const resp = await fetch('/drawing-checker/api/checklists', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const res  = await resp.json();
+    if (!resp.ok) { alert('儲存失敗：'+(res.detail||resp.status)); return; }
+    document.getElementById('saved-count-badge').textContent = res.count;
+    const btn = document.querySelector('.btn-save');
+    const orig = btn.innerHTML;
+    btn.innerHTML='<i class="bi bi-check-circle me-1"></i>已儲存！'; btn.style.background='#16a34a';
+    setTimeout(()=>{btn.innerHTML=orig;btn.style.background='';}, 1800);
+  } catch(e) { alert('網路錯誤：'+e.message); }
+}
+
+// ── 儲存清單 ─────────────────────────────────────────
+async function openSavedList() {
+  await loadSavedList();
+  bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('savedOffcanvas')).show();
+}
+
+async function loadSavedList() {
+  const container = document.getElementById('saved-list-container');
+  container.innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px;font-size:.8rem">載入中…</p>';
+  try {
+    const resp = await fetch('/drawing-checker/api/checklists');
+    const res  = await resp.json();
+    document.getElementById('saved-count-badge').textContent = res.count;
+    if (!res.items || res.items.length===0) {
+      container.innerHTML=`<div style="text-align:center;padding:40px 20px;color:#94a3b8"><i class="bi bi-archive" style="font-size:2.5rem"></i><p class="mt-3" style="font-size:.85rem">尚無已儲存的檢表</p></div>`;
+      return;
+    }
+    container.innerHTML = res.items.map(item => {
+      const thumb = item.preview_b64
+        ? `<img class="saved-thumb" src="${item.preview_b64}" alt="">`
+        : `<div class="saved-thumb-placeholder"><i class="bi bi-file-earmark-image"></i></div>`;
+      return `<div class="saved-card">${thumb}<div class="saved-info">
+        <div class="saved-name" title="${item.part_name}">${item.part_name}</div>
+        <div class="saved-sub">${[item.drawing_no,item.internal_no].filter(Boolean).join(' · ')||'—'}</div>
+        <div class="saved-actions">
+          <button class="btn-load" onclick="loadChecklist(${item.id})"><i class="bi bi-box-arrow-in-down me-1"></i>載入</button>
+          <button class="btn-del" onclick="deleteChecklist(${item.id},this)"><i class="bi bi-trash"></i></button>
+        </div>
+      </div></div>`;
+    }).join('');
+  } catch(e) { container.innerHTML=`<p style="color:var(--red);padding:16px;font-size:.8rem">載入失敗：${e.message}</p>`; }
+}
+
+async function loadChecklist(id) {
+  try {
+    const resp = await fetch(`/drawing-checker/api/checklists/${id}`);
+    if (!resp.ok) { alert('找不到該檢表'); return; }
+    const row = await resp.json();
+    currentData = {part_name:row.part_name, drawing_no:row.drawing_no, preview:row.preview_b64||'', dimensions:row.dimensions||[]};
+    isMockMode = false; mockBadge.style.display='none';
+    renderResult(currentData);
+    const tools = row.tools||{};
+    Object.entries(tools).forEach(([rowIdx,val])=>{
+      const sel = document.querySelector(`.tool-select[data-row="${rowIdx}"]`);
+      if(sel) sel.value = val;
+    });
+    document.getElementById('res-inspector').value = row.drawing_no || '';
+    document.getElementById('f-spec').value        = row.internal_no || '';
+    bootstrap.Offcanvas.getInstance(document.getElementById('savedOffcanvas'))?.hide();
+  } catch(e) { alert('載入失敗：'+e.message); }
+}
+
+async function deleteChecklist(id, btn) {
+  if (!confirm('確定要刪除這份檢表？')) return;
+  try {
+    const resp = await fetch(`/drawing-checker/api/checklists/${id}`,{method:'DELETE'});
+    const res  = await resp.json();
+    document.getElementById('saved-count-badge').textContent = res.count;
+    btn.closest('.saved-card').remove();
+    if (res.count===0) loadSavedList();
+  } catch(e) { alert('刪除失敗：'+e.message); }
+}
+
+(async()=>{
+  try {
+    const resp = await fetch('/drawing-checker/api/checklists');
+    const res  = await resp.json();
+    document.getElementById('saved-count-badge').textContent = res.count;
+  } catch(_){}
+})();
+</script>
+</body>
+</html>

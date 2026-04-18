@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}供應商主檔{% endblock %}
+{% block content %}
+<div class="container-fluid py-3">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0"><i class="bi bi-truck me-2 text-primary"></i>供應商主檔（NPI 詢價用）</h4>
+    {% if can_manage %}
+    <a href="/suppliers/new" class="btn btn-primary">
+      <i class="bi bi-plus-circle me-1"></i>新增供應商
+    </a>
+    {% endif %}
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>類型</th>
+              <th>名稱</th>
+              <th>聯絡人</th>
+              <th>Email</th>
+              <th>電話</th>
+              <th>狀態</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in items %}
+            <tr class="{% if not s.is_active %}text-muted{% endif %}">
+              <td>
+                {% if s.type.value == '廠內' %}
+                  <span class="badge bg-info-subtle text-info border border-info-subtle">廠內</span>
+                {% else %}
+                  <span class="badge bg-warning-subtle text-warning border border-warning-subtle">外部</span>
+                {% endif %}
+              </td>
+              <td class="fw-semibold">{{ s.name }}</td>
+              <td>{{ s.contact or '—' }}</td>
+              <td>{{ s.email or '—' }}</td>
+              <td>{{ s.phone or '—' }}</td>
+              <td>
+                {% if s.is_active %}
+                <span class="badge bg-success">啟用</span>
+                {% else %}
+                <span class="badge bg-secondary">停用</span>
+                {% endif %}
+              </td>
+              <td class="text-end">
+                {% if can_manage %}
+                <a href="/suppliers/{{ s.id }}/edit" class="btn btn-sm btn-outline-secondary">
+                  <i class="bi bi-pencil"></i>
+                </a>
+                <form method="post" action="/suppliers/{{ s.id }}/toggle" class="d-inline">
+                  <button class="btn btn-sm btn-outline-{% if s.is_active %}warning{% else %}success{% endif %}">
+                    <i class="bi bi-toggle-{% if s.is_active %}on{% else %}off{% endif %}"></i>
+                  </button>
+                </form>
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" class="text-center text-muted py-4">
+              <i class="bi bi-inbox fs-4 d-block mb-1"></i>尚無供應商資料
+            </td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

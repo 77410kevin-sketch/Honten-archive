@@ -53,6 +53,10 @@ async def seed_users():
 async def run_migrations():
     """補齊新欄位（ALTER TABLE IF NOT EXISTS 等效）"""
     migrations = [
+        # NPI 報價試算欄位
+        "ALTER TABLE npi_forms ADD COLUMN quote_cost_data TEXT",
+        "ALTER TABLE npi_forms ADD COLUMN quoted_unit_price FLOAT",
+        "ALTER TABLE npi_forms ADD COLUMN bu_quote_note TEXT",
         # PCNApproval 退回對象欄位
         "ALTER TABLE pcn_approvals ADD COLUMN reject_target VARCHAR(50)",
         # ECN 設計變更庫存盤點

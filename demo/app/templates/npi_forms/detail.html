@@ -17,7 +17,9 @@
         {% if s == 'DRAFT' %}<span class="badge bg-secondary">草稿</span>
         {% elif s == 'ENG_DISPATCH' %}<span class="badge bg-primary">待工程派發</span>
         {% elif s == 'QUOTING' %}<span class="badge bg-info text-dark">報價中</span>
-        {% elif s == 'QUOTES_COLLECTED' %}<span class="badge" style="background:#6f42c1;color:#fff">報價收齊</span>
+        {% elif s == 'QUOTES_COLLECTED' %}<span class="badge" style="background:#6f42c1;color:#fff">採購收齊</span>
+        {% elif s == 'PENDING_QUOTE_BU' %}<span class="badge" style="background:#fd7e14;color:#fff">待 BU 審核報價</span>
+        {% elif s == 'QUOTE_APPROVED' %}<span class="badge" style="background:#20c997;color:#fff">報價已核准</span>
         {% elif s == 'RFQ_DONE' %}<span class="badge bg-success">已發客戶報價</span>
         {% elif s == 'NPI_STARTED' %}<span class="badge bg-warning text-dark">NPI 啟動</span>
         {% elif s == 'NPI_PENDING_BU' %}<span class="badge bg-warning">待 BU 核准</span>
@@ -49,7 +51,9 @@
     ('DRAFT', '草稿', 'bi-pencil-square'),
     ('ENG_DISPATCH', '待工程派發', 'bi-send'),
     ('QUOTING', '供應商報價中', 'bi-hourglass-split'),
-    ('QUOTES_COLLECTED', '報價收齊', 'bi-collection'),
+    ('QUOTES_COLLECTED', '採購收齊', 'bi-collection'),
+    ('PENDING_QUOTE_BU', '業務試算→BU', 'bi-calculator'),
+    ('QUOTE_APPROVED', '報價已核准', 'bi-patch-check'),
     ('RFQ_DONE', '已發客戶報價', 'bi-envelope-check'),
     ('NPI_STARTED', 'NPI 啟動', 'bi-play-circle'),
     ('NPI_PENDING_BU', '待 BU 核准', 'bi-person-check'),
@@ -133,7 +137,7 @@
       {% endif %}
 
       {# 供應商派發 / 報價收集 #}
-      {% if form.status.value in ('ENG_DISPATCH','QUOTING','QUOTES_COLLECTED','RFQ_DONE','NPI_STARTED','NPI_PENDING_BU','NPI_PENDING_PURCHASE','CLOSED') %}
+      {% if form.status.value in ('ENG_DISPATCH','QUOTING','QUOTES_COLLECTED','PENDING_QUOTE_BU','QUOTE_APPROVED','RFQ_DONE','NPI_STARTED','NPI_PENDING_BU','NPI_PENDING_PURCHASE','CLOSED') %}
       <div class="card shadow-sm mb-3">
         <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
           <span><i class="bi bi-truck me-2"></i>供應商派發 / 報價</span>
@@ -183,7 +187,7 @@
                   {% endif %}
                 </td>
                 <td>
-                  {% if form.status.value == 'QUOTING' and user.role.value in ('engineer','admin') and not inv.replied_at %}
+                  {% if form.status.value == 'QUOTING' and user.role.value in ('purchase','engineer','admin') and not inv.replied_at %}
                   <button class="btn btn-sm btn-outline-primary"
                           data-bs-toggle="modal" data-bs-target="#replyModal-{{ inv.id }}">
                     回填
@@ -199,6 +203,59 @@
           {% endif %}
         </div>
       </div>
+      {% endif %}
+
+      {# 業務報價試算表（只要進入業務試算階段都顯示）#}
+      {% if form.status.value in ('QUOTES_COLLECTED','PENDING_QUOTE_BU','QUOTE_APPROVED','RFQ_DONE','NPI_STARTED','NPI_PENDING_BU','NPI_PENDING_PURCHASE','CLOSED') or form.quote_cost_data %}
+      <div class="card shadow-sm mb-3">
+        <div class="card-header bg-white fw-semibold">
+          <i class="bi bi-calculator me-2"></i>業務成本試算表 / 客戶報價
+          {% if form.status.value == 'PENDING_QUOTE_BU' %}
+            <span class="badge bg-warning ms-2">待 BU 審核</span>
+          {% elif form.status.value in ('QUOTE_APPROVED','RFQ_DONE','NPI_STARTED','NPI_PENDING_BU','NPI_PENDING_PURCHASE','CLOSED') %}
+            <span class="badge bg-success ms-2">已核准</span>
+          {% endif %}
+        </div>
+        <div class="card-body small">
+          <div id="quoteSheetView"></div>
+          <div class="row g-2 mt-2">
+            <div class="col-md-4"><strong>業務決定報價單價：</strong>
+              <span class="text-primary fw-bold fs-6">{{ form.quoted_unit_price or '—' }}</span>
+              {% if form.target_price %}<small class="text-muted">（客戶目標 {{ form.target_price }}）</small>{% endif %}
+            </div>
+            <div class="col-md-8"><strong>業務備註：</strong>{{ form.cost_analysis_note or '—' }}</div>
+            {% if form.bu_quote_note %}
+            <div class="col-12"><strong>BU 評語：</strong><span class="text-muted">{{ form.bu_quote_note }}</span></div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      <script>
+      (function() {
+        const raw = {{ (form.quote_cost_data or '""') | tojson }};
+        try {
+          const data = (typeof raw === 'string' && raw) ? JSON.parse(raw) : (typeof raw === 'object' ? raw : null);
+          if (!data || !data.items || !data.items.length) {
+            document.getElementById('quoteSheetView').innerHTML =
+              '<div class="text-muted">業務尚未試算。</div>';
+            return;
+          }
+          let html = '<table class="table table-sm"><thead class="table-light"><tr><th>項目</th><th class="text-end">數量</th><th class="text-end">單價</th><th class="text-end">小計</th></tr></thead><tbody>';
+          data.items.forEach(it => {
+            html += `<tr><td>${it.name||''}</td><td class="text-end">${it.qty||''}</td><td class="text-end">${it.unit_cost||''}</td><td class="text-end">${it.subtotal||''}</td></tr>`;
+          });
+          html += `</tbody><tfoot class="fw-semibold">
+            <tr><td colspan="3" class="text-end">直接成本合計</td><td class="text-end">${data.total_direct_cost||'—'}</td></tr>
+            <tr><td colspan="3" class="text-end">管銷費 (${((data.overhead_rate||0)*100).toFixed(1)}%)</td><td class="text-end">${data.overhead_amount||'—'}</td></tr>
+            <tr><td colspan="3" class="text-end">目標毛利 (${((data.margin_rate||0)*100).toFixed(1)}%)</td><td class="text-end">${data.margin_amount||'—'}</td></tr>
+            <tr class="table-primary"><td colspan="3" class="text-end">建議售價</td><td class="text-end">${data.suggested_unit_price||'—'}</td></tr>
+          </tfoot></table>`;
+          document.getElementById('quoteSheetView').innerHTML = html;
+        } catch (e) {
+          document.getElementById('quoteSheetView').innerHTML = '<span class="text-danger">試算表解析錯誤</span>';
+        }
+      })();
+      </script>
       {% endif %}
 
       {# NPI 模具成本與 ERP 請購單 #}
@@ -265,17 +322,38 @@
           </form>
           {% endif %}
 
-          {# 工程宣告報價收齊 #}
-          {% if form.status.value == 'QUOTING' and user.role.value in ('engineer','admin') %}
+          {# 採購/工程宣告報價收齊 #}
+          {% if form.status.value == 'QUOTING' and user.role.value in ('purchase','engineer','admin') %}
           <form method="post" action="/npi-forms/{{ form.form_id }}/finish-quotes" class="mb-2">
             <button class="btn btn-info w-100 text-white">
-              <i class="bi bi-check2-all me-1"></i>報價收齊，交業務
+              <i class="bi bi-check2-all me-1"></i>報價收齊，交業務試算
             </button>
           </form>
           {% endif %}
 
-          {# 業務：完成成本分析 → 發送客戶 #}
-          {% if form.status.value == 'QUOTES_COLLECTED' and user.role.value in ('sales','admin') %}
+          {# 業務：做試算 → 送 BU 審核報價 #}
+          {% if (form.status.value == 'QUOTES_COLLECTED'
+                 or (form.status.value == 'RETURNED' and form.reject_to == '業務'))
+              and user.role.value in ('sales','admin') %}
+          <button class="btn btn-warning w-100 mb-2" data-bs-toggle="modal" data-bs-target="#submitQuoteBuModal">
+            <i class="bi bi-calculator me-1"></i>上線試算 + 送 BU 審核報價
+          </button>
+          {% endif %}
+
+          {# BU：核准 / 退回報價 #}
+          {% if form.status.value == 'PENDING_QUOTE_BU' and user.role.value in ('bu','admin') %}
+          <form method="post" action="/npi-forms/{{ form.form_id }}/approve-quote-bu" class="mb-2">
+            <input type="hidden" name="comment" value="核准報價">
+            <button class="btn btn-success w-100"><i class="bi bi-check-lg me-1"></i>核准報價</button>
+          </form>
+          <button class="btn btn-outline-danger w-100 mb-2"
+                  data-bs-toggle="modal" data-bs-target="#rejectQuoteBuModal">
+            <i class="bi bi-x-lg me-1"></i>退回業務重算
+          </button>
+          {% endif %}
+
+          {# 業務：發送客戶報價（僅限 BU 核准後）#}
+          {% if form.status.value == 'QUOTE_APPROVED' and user.role.value in ('sales','admin') %}
           <button class="btn btn-success w-100 mb-2" data-bs-toggle="modal" data-bs-target="#sendCustomerQuoteModal">
             <i class="bi bi-envelope-check me-1"></i>發送客戶報價
           </button>
@@ -481,8 +559,208 @@
 {% endif %}
 {% endfor %}
 
-{# 業務發送客戶報價 #}
-{% if form.status.value == 'QUOTES_COLLECTED' and user.role.value in ('sales','admin') %}
+{# 業務試算 + 送 BU 審核報價 modal #}
+{% if (form.status.value == 'QUOTES_COLLECTED'
+       or (form.status.value == 'RETURNED' and form.reject_to == '業務'))
+    and user.role.value in ('sales','admin') %}
+<div class="modal fade" id="submitQuoteBuModal" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <form class="modal-content" method="post" action="/npi-forms/{{ form.form_id }}/submit-quote-bu">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-calculator me-2"></i>業務成本試算 → 送 BU 審核報價</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-info small">
+          請輸入成本明細項目（料件、模具攤提、人工、製造費用…），系統自動計算直接成本合計、管銷費、毛利與建議售價。
+          業務可覆寫建議售價決定最終報價單價。送出後將通知 BU 主管審核。
+        </div>
+        <table class="table table-sm" id="quoteSheetTable">
+          <thead class="table-light">
+            <tr>
+              <th style="min-width:160px">項目</th>
+              <th style="width:120px">數量</th>
+              <th style="width:130px">單價</th>
+              <th style="width:130px">小計</th>
+              <th style="width:40px"></th>
+            </tr>
+          </thead>
+          <tbody id="quoteRows">
+            <tr class="quote-row">
+              <td><input name="_n" class="form-control form-control-sm q-name" placeholder="例：模具攤提"></td>
+              <td><input name="_q" type="number" step="any" class="form-control form-control-sm q-qty"></td>
+              <td><input name="_u" type="number" step="any" class="form-control form-control-sm q-unit"></td>
+              <td><input class="form-control form-control-sm q-sub bg-light" readonly></td>
+              <td><button type="button" class="btn btn-sm btn-outline-danger q-del"><i class="bi bi-x"></i></button></td>
+            </tr>
+          </tbody>
+        </table>
+        <button type="button" id="addQuoteRow" class="btn btn-sm btn-outline-primary mb-3">
+          <i class="bi bi-plus"></i> 加一列明細
+        </button>
+        <div class="row g-3">
+          <div class="col-md-3">
+            <label class="form-label small">直接成本合計</label>
+            <input id="totalDirect" class="form-control bg-light" readonly>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small">管銷費 %</label>
+            <input id="overheadRate" type="number" step="0.1" value="8" class="form-control">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small">目標毛利 %</label>
+            <input id="marginRate" type="number" step="0.1" value="25" class="form-control">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small">建議售價（自動）</label>
+            <input id="suggestedPrice" class="form-control bg-light fw-bold text-primary" readonly>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small">客戶目標單價</label>
+            <input class="form-control bg-light" readonly value="{{ form.target_price or '—' }}">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small">業務決定報價單價 <span class="text-danger">*</span></label>
+            <input name="quoted_unit_price" id="finalQuote" type="number" step="0.01" class="form-control" required>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small">毛利率（實際）</label>
+            <input id="actualMargin" class="form-control bg-light" readonly>
+          </div>
+          <div class="col-12">
+            <label class="form-label small">業務備註 / 給 BU 的說明</label>
+            <textarea name="cost_analysis_note" rows="2" class="form-control"
+                      placeholder="例：客戶壓價至 380，但選用豐鑫 (880K) 仍維持 24% 毛利…">{{ form.cost_analysis_note or '' }}</textarea>
+          </div>
+        </div>
+        {# 隱藏欄位存 JSON 快照 #}
+        <input type="hidden" name="quote_cost_data" id="quoteCostData">
+        <input type="hidden" name="comment" value="業務送 BU 審核報價">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="submit" class="btn btn-warning" id="submitQuoteBtn">
+          <i class="bi bi-send-check me-1"></i>送 BU 審核報價
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+(function() {
+  const tbody = document.getElementById('quoteRows');
+  function recalc() {
+    let total = 0;
+    document.querySelectorAll('#quoteRows .quote-row').forEach(r => {
+      const q = parseFloat(r.querySelector('.q-qty').value) || 0;
+      const u = parseFloat(r.querySelector('.q-unit').value) || 0;
+      const s = q * u;
+      r.querySelector('.q-sub').value = s ? s.toFixed(2) : '';
+      total += s;
+    });
+    document.getElementById('totalDirect').value = total.toFixed(2);
+    const oh = (parseFloat(document.getElementById('overheadRate').value)||0)/100;
+    const mr = (parseFloat(document.getElementById('marginRate').value)||0)/100;
+    const costAfterOH = total * (1 + oh);
+    const suggested = mr < 1 ? costAfterOH / (1 - mr) : 0;
+    document.getElementById('suggestedPrice').value = suggested.toFixed(2);
+    if (!document.getElementById('finalQuote').value) {
+      document.getElementById('finalQuote').value = suggested.toFixed(2);
+    }
+    const fq = parseFloat(document.getElementById('finalQuote').value)||0;
+    document.getElementById('actualMargin').value = fq > 0 ?
+      (((fq - costAfterOH) / fq) * 100).toFixed(2) + '%' : '—';
+  }
+  document.getElementById('addQuoteRow').addEventListener('click', () => {
+    const first = tbody.querySelector('.quote-row');
+    const clone = first.cloneNode(true);
+    clone.querySelectorAll('input').forEach(i => i.value = '');
+    tbody.appendChild(clone);
+  });
+  document.addEventListener('click', e => {
+    if (e.target.closest('.q-del')) {
+      const rows = tbody.querySelectorAll('.quote-row');
+      if (rows.length > 1) e.target.closest('.quote-row').remove();
+      recalc();
+    }
+  });
+  document.addEventListener('input', e => {
+    if (e.target.closest('#submitQuoteBuModal')) recalc();
+  });
+  // 送出前把試算資料序列化到 hidden input
+  document.querySelector('#submitQuoteBuModal form').addEventListener('submit', () => {
+    const items = [];
+    document.querySelectorAll('#quoteRows .quote-row').forEach(r => {
+      const name = r.querySelector('.q-name').value.trim();
+      if (!name) return;
+      const qty = parseFloat(r.querySelector('.q-qty').value)||0;
+      const u = parseFloat(r.querySelector('.q-unit').value)||0;
+      items.push({name, qty, unit_cost: u, subtotal: +(qty*u).toFixed(2)});
+    });
+    const total = parseFloat(document.getElementById('totalDirect').value)||0;
+    const oh = (parseFloat(document.getElementById('overheadRate').value)||0)/100;
+    const mr = (parseFloat(document.getElementById('marginRate').value)||0)/100;
+    const suggested = parseFloat(document.getElementById('suggestedPrice').value)||0;
+    document.getElementById('quoteCostData').value = JSON.stringify({
+      items,
+      total_direct_cost: total,
+      overhead_rate: oh,
+      overhead_amount: +(total*oh).toFixed(2),
+      margin_rate: mr,
+      margin_amount: +(suggested*mr).toFixed(2),
+      suggested_unit_price: suggested,
+    });
+  });
+  // 如果已有舊試算，load 回來
+  const old = {{ (form.quote_cost_data or '""') | tojson }};
+  try {
+    const data = (typeof old === 'string' && old) ? JSON.parse(old) : old;
+    if (data && data.items && data.items.length) {
+      tbody.innerHTML = '';
+      data.items.forEach(it => {
+        const first = `<tr class="quote-row">
+          <td><input name="_n" class="form-control form-control-sm q-name" value="${it.name||''}"></td>
+          <td><input name="_q" type="number" step="any" class="form-control form-control-sm q-qty" value="${it.qty||''}"></td>
+          <td><input name="_u" type="number" step="any" class="form-control form-control-sm q-unit" value="${it.unit_cost||''}"></td>
+          <td><input class="form-control form-control-sm q-sub bg-light" readonly value="${it.subtotal||''}"></td>
+          <td><button type="button" class="btn btn-sm btn-outline-danger q-del"><i class="bi bi-x"></i></button></td>
+        </tr>`;
+        tbody.insertAdjacentHTML('beforeend', first);
+      });
+      if (data.overhead_rate) document.getElementById('overheadRate').value = (data.overhead_rate*100).toFixed(1);
+      if (data.margin_rate) document.getElementById('marginRate').value = (data.margin_rate*100).toFixed(1);
+      document.getElementById('finalQuote').value = {{ (form.quoted_unit_price or 0) | tojson }} || '';
+    }
+  } catch(e) {}
+  recalc();
+})();
+</script>
+{% endif %}
+
+{# BU 退回業務報價 #}
+{% if form.status.value == 'PENDING_QUOTE_BU' and user.role.value in ('bu','admin') %}
+<div class="modal fade" id="rejectQuoteBuModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form class="modal-content" method="post" action="/npi-forms/{{ form.form_id }}/reject-quote-bu">
+      <div class="modal-header"><h5 class="modal-title">退回業務重算</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label">退回原因 <span class="text-danger">*</span></label>
+        <textarea name="comment" rows="3" class="form-control" required
+                  placeholder="例：毛利偏低、料件成本請重新確認…"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
+        <button class="btn btn-danger">確認退回</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{# 業務發送客戶報價（僅限 BU 核准後）#}
+{% if form.status.value == 'QUOTE_APPROVED' and user.role.value in ('sales','admin') %}
 <div class="modal fade" id="sendCustomerQuoteModal" tabindex="-1">
   <div class="modal-dialog">
     <form class="modal-content" method="post" enctype="multipart/form-data"

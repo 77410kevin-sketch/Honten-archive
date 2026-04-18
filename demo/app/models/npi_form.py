@@ -14,8 +14,10 @@ class NPIFormStatus(str, enum.Enum):
     # RFQ 流程
     DRAFT                = "DRAFT"                # 業務草稿
     ENG_DISPATCH         = "ENG_DISPATCH"         # 工程排製程並派發供應商
-    QUOTING              = "QUOTING"              # 供應商報價中
-    QUOTES_COLLECTED     = "QUOTES_COLLECTED"     # 報價收齊，業務製作成本分析/客戶報價
+    QUOTING              = "QUOTING"              # 供應商報價中（採購收集）
+    QUOTES_COLLECTED     = "QUOTES_COLLECTED"     # 採購宣告收齊 → 交業務試算
+    PENDING_QUOTE_BU     = "PENDING_QUOTE_BU"     # 業務完成試算 → 送 BU 審核報價/利潤
+    QUOTE_APPROVED       = "QUOTE_APPROVED"       # BU 核准 → 業務可發送客戶
     RFQ_DONE             = "RFQ_DONE"             # 客戶報價已發送（等客戶決定）
     # NPI 流程
     NPI_STARTED          = "NPI_STARTED"          # 客戶確定開發，工程選供應商
@@ -50,6 +52,9 @@ class NPIForm(Base):
     sales_note       = Column(Text, nullable=True)   # 業務補充資訊
     eng_process_note = Column(Text, nullable=True)   # 工程排製程評估內容
     cost_analysis_note = Column(Text, nullable=True) # 業務成本分析摘要
+    quote_cost_data  = Column(Text, nullable=True)   # 業務試算 JSON（明細/管銷/毛利/建議售價）
+    quoted_unit_price= Column(Float, nullable=True)  # 業務決定給客戶的報價單價
+    bu_quote_note    = Column(Text, nullable=True)   # BU 對報價的核准/退回評語
     selected_quote_supplier_id = Column(Integer, ForeignKey("suppliers.id"), nullable=True)
 
     # NPI 階段（ERP 模具請購單）

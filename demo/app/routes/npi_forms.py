@@ -39,6 +39,8 @@ _SALES_ROLES = (Role.SALES, Role.ADMIN)
 _ENG_ROLES   = (Role.ENGINEER, Role.ADMIN)
 _BU_ROLES    = (Role.BU, Role.ADMIN)
 _PURCHASE_ROLES = (Role.PURCHASE, Role.ADMIN)
+# RFQ 階段：供應商報價回收 / 宣告收齊 — 採購主責，工程也可協助
+_RFQ_COLLECT_ROLES = (Role.PURCHASE, Role.ENGINEER, Role.ADMIN)
 
 ATTACH_CATEGORIES = [
     "客戶詢價信", "規格書", "圖面",
@@ -164,7 +166,11 @@ async def list_npi(
                  NPIForm.reject_to.in_(["工程師", "業務"])),
         ))
     elif u.role == Role.PURCHASE:
-        q = q.where(NPIForm.status == NPIFormStatus.NPI_PENDING_PURCHASE)
+        q = q.where(NPIForm.status.in_([
+            NPIFormStatus.QUOTING,            # RFQ 階段收集供應商報價
+            NPIFormStatus.QUOTES_COLLECTED,
+            NPIFormStatus.NPI_PENDING_PURCHASE, # NPI 階段模具議價
+        ]))
     else:
         q = q.where(NPIForm.created_by == u.id)
     r = await db.execute(q)
@@ -450,8 +456,8 @@ async def fill_invite_reply(
     form = await _get_form_or_404(form_id, db)
     if form.status != NPIFormStatus.QUOTING:
         raise HTTPException(status_code=400, detail="目前狀態非報價中")
-    if current_user.role not in (Role.ENGINEER, Role.ADMIN):
-        raise HTTPException(status_code=403)
+    if current_user.role not in _RFQ_COLLECT_ROLES:
+        raise HTTPException(status_code=403, detail="只有採購 / 工程可以回填報價")
     inv = next((i for i in form.invites if i.id == invite_id), None)
     if not inv:
         raise HTTPException(status_code=404, detail="找不到派發紀錄")
@@ -484,16 +490,106 @@ async def finish_quotes(
     form = await _get_form_or_404(form_id, db)
     if form.status != NPIFormStatus.QUOTING:
         raise HTTPException(status_code=400)
-    if current_user.role not in _ENG_ROLES:
-        raise HTTPException(status_code=403)
-    # 不強制要求已有回覆 — 由工程自行判斷（例如部分供應商婉拒報價、或口頭報價先轉業務）
+    if current_user.role not in _RFQ_COLLECT_ROLES:
+        raise HTTPException(status_code=403, detail="只有採購 / 工程可宣告報價收齊")
     old = form.status
     form.status = NPIFormStatus.QUOTES_COLLECTED
     form.updated_at = datetime.utcnow()
     db.add(_log_approval(form, current_user, "FINISH_QUOTES", old, form.status, comment))
     await db.commit()
     await notif._notify_roles(db, [Role.SALES],
-                             f"【RFQ 報價已收齊】{form.form_id} - 請製作成本分析與客戶報價單")
+                             f"【RFQ 報價已收齊】{form.form_id} - 請上線試算成本並送 BU 審核")
+    return RedirectResponse(url=f"/npi-forms/{form_id}", status_code=303)
+
+
+# ── 業務試算完成 → 送 BU 審核報價 ─────────
+
+@router.post("/{form_id}/submit-quote-bu")
+async def submit_quote_bu(
+    form_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    quote_cost_data:    str = Form(""),   # JSON 試算表
+    cost_analysis_note: str = Form(""),
+    quoted_unit_price:  str = Form(""),   # 業務最終決定的報價單價
+    comment:            str = Form(""),
+):
+    form = await _get_form_or_404(form_id, db)
+    if form.status not in (NPIFormStatus.QUOTES_COLLECTED, NPIFormStatus.RETURNED):
+        raise HTTPException(status_code=400, detail="目前狀態不允許送 BU 審核報價")
+    if current_user.role not in _SALES_ROLES:
+        raise HTTPException(status_code=403)
+    if form.status == NPIFormStatus.RETURNED and form.reject_to != "業務":
+        raise HTTPException(status_code=400, detail="此退回單非給業務")
+    old = form.status
+    form.quote_cost_data    = quote_cost_data or None
+    form.cost_analysis_note = cost_analysis_note or None
+    form.quoted_unit_price  = float(quoted_unit_price) if quoted_unit_price else None
+    form.status = NPIFormStatus.PENDING_QUOTE_BU
+    form.reject_to = None
+    form.updated_at = datetime.utcnow()
+    db.add(_log_approval(form, current_user, "SUBMIT_QUOTE_BU", old, form.status, comment))
+    await db.commit()
+    await notif._notify_roles(
+        db, [Role.BU],
+        f"【RFQ 待 BU 審核報價】{form.form_id} - 建議報價 {form.quoted_unit_price or '—'}，請審核利潤",
+    )
+    return RedirectResponse(url=f"/npi-forms/{form_id}", status_code=303)
+
+
+# ── BU 核准 / 退回 業務報價 ─────────────
+
+@router.post("/{form_id}/approve-quote-bu")
+async def approve_quote_bu(
+    form_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    comment: str = Form(""),
+):
+    form = await _get_form_or_404(form_id, db)
+    if form.status != NPIFormStatus.PENDING_QUOTE_BU:
+        raise HTTPException(status_code=400)
+    if current_user.role not in _BU_ROLES:
+        raise HTTPException(status_code=403)
+    old = form.status
+    form.bu_quote_note = comment or None
+    form.status = NPIFormStatus.QUOTE_APPROVED
+    form.updated_at = datetime.utcnow()
+    db.add(_log_approval(form, current_user, "APPROVE_QUOTE_BU", old, form.status, comment))
+    await db.commit()
+    await notif._notify_roles(
+        db, [Role.SALES],
+        f"【報價已核准】{form.form_id} - BU 已核准，請發送客戶報價",
+    )
+    return RedirectResponse(url=f"/npi-forms/{form_id}", status_code=303)
+
+
+@router.post("/{form_id}/reject-quote-bu")
+async def reject_quote_bu(
+    form_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    comment: str = Form(...),
+):
+    form = await _get_form_or_404(form_id, db)
+    if form.status != NPIFormStatus.PENDING_QUOTE_BU:
+        raise HTTPException(status_code=400)
+    if current_user.role not in _BU_ROLES:
+        raise HTTPException(status_code=403)
+    if not comment.strip():
+        raise HTTPException(status_code=400, detail="退回原因不得為空")
+    old = form.status
+    form.bu_quote_note = comment.strip()
+    form.status = NPIFormStatus.RETURNED
+    form.reject_to = "業務"
+    form.updated_at = datetime.utcnow()
+    db.add(_log_approval(form, current_user, "REJECT_QUOTE_BU", old, form.status,
+                         comment.strip(), reject_target="業務"))
+    await db.commit()
+    await notif._notify_roles(
+        db, [Role.SALES],
+        f"【報價被 BU 退回】{form.form_id} - 請調整試算後重送。原因：{comment.strip()[:80]}",
+    )
     return RedirectResponse(url=f"/npi-forms/{form_id}", status_code=303)
 
 
@@ -510,8 +606,8 @@ async def send_customer_quote(
     attach_categories: List[str] = Form(default=[]),
 ):
     form = await _get_form_or_404(form_id, db)
-    if form.status != NPIFormStatus.QUOTES_COLLECTED:
-        raise HTTPException(status_code=400)
+    if form.status != NPIFormStatus.QUOTE_APPROVED:
+        raise HTTPException(status_code=400, detail="需先由 BU 核准報價才能發送客戶")
     if current_user.role not in _SALES_ROLES:
         raise HTTPException(status_code=403)
     if attach_files:
@@ -519,11 +615,7 @@ async def send_customer_quote(
         await db.commit()
         db.expire_all()
         form = await _get_form_or_404(form_id, db)
-    cats = {d.category for d in form.documents}
-    if "成本分析表" not in cats:
-        raise HTTPException(status_code=400, detail="請先上傳【成本分析表】")
-    if "客戶報價單" not in cats:
-        raise HTTPException(status_code=400, detail="請先上傳【客戶報價單】")
+    # 發送客戶時不強制驗證附件（可已於試算階段上傳）
     old = form.status
     form.cost_analysis_note = cost_analysis_note or None
     form.status = NPIFormStatus.RFQ_DONE

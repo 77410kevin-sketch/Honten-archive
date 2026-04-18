@@ -2126,3 +2126,22 @@ After doing this, you may fix the identity used for this commit with:
 To github.com:77410kevin-sketch/Honten.git
    e6cd861..c7e7b88  main -> main
 [2026-04-18 12:38] ✅ 已自動 push
+[main bc4acd8] 自動備份 2026-04-18 13:39
+ Committer: kevin <kevin@kevindeMac-mini.local>
+Your name and email address were configured automatically based
+on your username and hostname. Please check that they are accurate.
+You can suppress this message by setting them explicitly. Run the
+following command and follow the instructions in your editor to edit
+your configuration file:
+
+    git config --global --edit
+
+After doing this, you may fix the identity used for this commit with:
+
+    git commit --amend --reset-author
+
+ 7 files changed, 357 insertions(+), 16 deletions(-)
+ create mode 100644 feature/npi-module/app/services/inquiry_parser.py
+To github.com:77410kevin-sketch/Honten.git
+   c7e7b88..bc4acd8  main -> main
+[2026-04-18 13:39] ✅ 已自動 push

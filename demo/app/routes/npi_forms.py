@@ -486,8 +486,7 @@ async def finish_quotes(
         raise HTTPException(status_code=400)
     if current_user.role not in _ENG_ROLES:
         raise HTTPException(status_code=403)
-    if not any(i.replied_at for i in form.invites):
-        raise HTTPException(status_code=400, detail="尚無任一家供應商回覆報價")
+    # 不強制要求已有回覆 — 由工程自行判斷（例如部分供應商婉拒報價、或口頭報價先轉業務）
     old = form.status
     form.status = NPIFormStatus.QUOTES_COLLECTED
     form.updated_at = datetime.utcnow()

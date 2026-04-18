@@ -44,6 +44,62 @@
     </div>
   </div>
 
+  {# ── 流程步驟圖 ── #}
+  {% set stages = [
+    ('DRAFT', '草稿', 'bi-pencil-square'),
+    ('ENG_DISPATCH', '待工程派發', 'bi-send'),
+    ('QUOTING', '供應商報價中', 'bi-hourglass-split'),
+    ('QUOTES_COLLECTED', '報價收齊', 'bi-collection'),
+    ('RFQ_DONE', '已發客戶報價', 'bi-envelope-check'),
+    ('NPI_STARTED', 'NPI 啟動', 'bi-play-circle'),
+    ('NPI_PENDING_BU', '待 BU 核准', 'bi-person-check'),
+    ('NPI_PENDING_PURCHASE', '待採購議價', 'bi-cash-coin'),
+    ('CLOSED', '結案', 'bi-check-circle-fill'),
+  ] %}
+  {% set cur = form.status.value %}
+  {% set ns = namespace(idx=-1) %}
+  {% for code, _lbl, _i in stages %}
+    {% if code == cur %}{% set ns.idx = loop.index0 %}{% endif %}
+  {% endfor %}
+  {% set cur_idx = ns.idx %}
+  <div class="card shadow-sm mb-3">
+    <div class="card-body py-3">
+      <div class="d-flex align-items-start overflow-auto npi-stepper">
+        {% for code, label, icon in stages %}
+        {% set done = cur_idx > -1 and loop.index0 < cur_idx %}
+        {% set active = cur == code %}
+        <div class="text-center flex-grow-1" style="min-width:95px">
+          <div class="mx-auto d-flex align-items-center justify-content-center fw-bold
+              {% if done %}bg-success text-white
+              {% elif active %}bg-primary text-white border border-3 border-primary shadow
+              {% else %}bg-light text-muted border{% endif %}"
+              style="width:42px;height:42px;border-radius:50%">
+            {% if done %}<i class="bi bi-check-lg"></i>
+            {% else %}<i class="bi {{ icon }}"></i>
+            {% endif %}
+          </div>
+          <div class="small mt-1 {% if active %}fw-bold text-primary{% elif done %}text-success{% else %}text-muted{% endif %}">
+            {{ label }}
+          </div>
+        </div>
+        {% if not loop.last %}
+        <div class="flex-grow-1 mx-1" style="height:2px;background:{% if done %}#198754{% else %}#dee2e6{% endif %};margin-top:20px"></div>
+        {% endif %}
+        {% endfor %}
+      </div>
+      {% if cur == 'RETURNED' %}
+      <div class="alert alert-danger py-2 mt-3 mb-0 small">
+        <i class="bi bi-exclamation-triangle me-1"></i>
+        目前單狀態為【退回】，退回對象：<strong>{{ form.reject_to or '—' }}</strong>。請對應角色修改後重送。
+      </div>
+      {% elif cur == 'CLOSED' %}
+      <div class="alert alert-success py-2 mt-3 mb-0 small text-center">
+        <i class="bi bi-check-circle-fill me-1"></i>本案已完成結案，資料已匯入 NAS、通知業務與 BU 主管
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
   <div class="row g-3">
 
     {# ── 左：主表單 ── #}

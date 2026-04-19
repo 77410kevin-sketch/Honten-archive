@@ -21,7 +21,7 @@ from app.models.supplier import Supplier, SupplierType
 from app.models.customer import Customer
 from app.models.npi_form import NPIForm, NPIDocument, NPIApproval, NPISupplierInvite
 from app.services.auth import hash_password
-from app.routes import auth, pcn_forms, drawing_checker, npi_forms, suppliers, customers
+from app.routes import auth, pcn_forms, drawing_checker, npi_forms, suppliers, customers, title_block
 
 
 # ── Seed 初始資料 ────────────────────────────────
@@ -164,6 +164,7 @@ app.include_router(drawing_checker.router)
 app.include_router(npi_forms.router)
 app.include_router(suppliers.router)
 app.include_router(customers.router)
+app.include_router(title_block.router)
 
 
 @app.get("/")

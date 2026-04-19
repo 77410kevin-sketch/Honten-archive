@@ -1,0 +1,261 @@
+{% extends "base.html" %}
+{% block title %}圖框轉換{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4 px-4">
+
+  <div class="d-flex align-items-center mb-3">
+    <h4 class="fw-bold mb-0"><i class="bi bi-border-outer me-2 text-primary"></i>圖框轉換工具</h4>
+    <span class="badge bg-warning text-dark ms-2">Beta · 預設圖框</span>
+    <span class="ms-auto small text-muted">辨識客戶圖框 → 替換為鴻騰電子標準圖框</span>
+  </div>
+
+  <div class="row g-3">
+    {# 左：上傳區 #}
+    <div class="col-lg-5">
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-primary text-white py-2">
+          <i class="bi bi-upload me-1"></i>上傳圖檔
+        </div>
+        <div class="card-body">
+
+          <div id="drop-zone"
+               class="border border-primary border-2 rounded-3 text-center p-4 mb-3"
+               style="border-style:dashed !important;background:#e8f4fd;cursor:pointer;transition:.2s">
+            <div style="font-size:2.4rem;color:#2196f3">
+              <i class="bi bi-cloud-arrow-up-fill"></i>
+            </div>
+            <div class="fw-semibold mt-1">拖曳圖檔至此，或點擊選擇</div>
+            <div class="small text-muted mt-1">
+              支援 <strong>PDF / DWG / DXF</strong>（單檔最大 50MB）
+            </div>
+            <input type="file" id="file-input" accept=".pdf,.dwg,.dxf" hidden>
+          </div>
+
+          <div id="file-info" class="small text-muted mb-3" style="display:none">
+            <i class="bi bi-file-earmark-check text-success me-1"></i>
+            <span id="file-name"></span>
+            <span class="text-muted" id="file-size"></span>
+          </div>
+
+          <div class="mb-2">
+            <label class="form-label small fw-semibold mb-1">圖號</label>
+            <input type="text" id="tb-drawing-no" class="form-control form-control-sm" placeholder="例：HT-2026-001">
+          </div>
+          <div class="mb-2">
+            <label class="form-label small fw-semibold mb-1">品名</label>
+            <input type="text" id="tb-title" class="form-control form-control-sm" placeholder="例：儲能機殼上蓋">
+          </div>
+          <div class="row g-2 mb-2">
+            <div class="col-7">
+              <label class="form-label small fw-semibold mb-1">材質</label>
+              <input type="text" id="tb-material" class="form-control form-control-sm" placeholder="例：SECC t1.2">
+            </div>
+            <div class="col-5">
+              <label class="form-label small fw-semibold mb-1">比例</label>
+              <input type="text" id="tb-scale" class="form-control form-control-sm" placeholder="1:1">
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold mb-1">繪圖者</label>
+            <input type="text" id="tb-drawer" class="form-control form-control-sm" value="{{ user.display_name }}">
+          </div>
+
+          <button id="convert-btn" class="btn btn-primary w-100" disabled>
+            <i class="bi bi-arrow-repeat me-1"></i>套用鴻騰電子圖框
+          </button>
+        </div>
+      </div>
+
+      <div class="card shadow-sm border-0 mt-3">
+        <div class="card-body py-3">
+          <div class="small text-muted">
+            <i class="bi bi-info-circle text-primary me-1"></i>
+            <strong>目前使用預設圖框樣板</strong>：深藍色標題列 + 圖號 / 品名 / 材質 / 比例 / 日期 / 繪圖者 六格資訊欄。未來可替換為最終鴻騰標準格式。
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# 右：預覽 / 結果 #}
+    <div class="col-lg-7">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-header bg-dark text-white py-2 d-flex align-items-center gap-2">
+          <i class="bi bi-eye me-1"></i>轉換結果預覽
+          <span id="preview-meta" class="small text-white-50"></span>
+          <a id="download-link" href="#" class="btn btn-sm btn-success ms-auto" style="display:none" download>
+            <i class="bi bi-file-earmark-pdf me-1"></i>下載向量 PDF
+          </a>
+        </div>
+        <div class="card-body p-0 position-relative"
+             style="min-height:520px;max-height:82vh;overflow:auto;background:#f1f5f9">
+
+          <div id="empty-hint" class="text-center text-muted py-5">
+            <i class="bi bi-image" style="font-size:3rem;opacity:.3"></i>
+            <div class="mt-2">請先於左側上傳圖檔並套用轉換</div>
+          </div>
+
+          <div id="loading" class="text-center py-5" style="display:none">
+            <div class="spinner-border text-primary" role="status"></div>
+            <div class="small text-muted mt-2">圖框轉換中，請稍候…</div>
+          </div>
+
+          <div id="preview-images" style="display:none;padding:12px"></div>
+
+          <div id="cad-note" class="p-4" style="display:none">
+            <div class="alert alert-warning">
+              <i class="bi bi-exclamation-triangle-fill me-1"></i>
+              <strong id="cad-filename"></strong>
+              <div class="small mt-2" id="cad-message"></div>
+            </div>
+          </div>
+
+          <div id="error-box" class="p-4" style="display:none">
+            <div class="alert alert-danger mb-0">
+              <i class="bi bi-x-octagon-fill me-1"></i>
+              <span id="error-msg"></span>
+            </div>
+          </div>
+
+        </div>
+        <div class="card-footer bg-light small text-muted">
+          <i class="bi bi-info-circle me-1"></i>
+          預覽圖為 200 DPI PNG（僅供瀏覽）；實際下載檔為<strong>完整保留原始解析度的向量 PDF</strong>。
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function() {
+  const dz        = document.getElementById('drop-zone');
+  const fi        = document.getElementById('file-input');
+  const fInfo     = document.getElementById('file-info');
+  const fName     = document.getElementById('file-name');
+  const fSize     = document.getElementById('file-size');
+  const btn       = document.getElementById('convert-btn');
+  const imgWrap   = document.getElementById('preview-images');
+  const meta      = document.getElementById('preview-meta');
+  const loading   = document.getElementById('loading');
+  const empty     = document.getElementById('empty-hint');
+  const cadNote   = document.getElementById('cad-note');
+  const cadName   = document.getElementById('cad-filename');
+  const cadMsg    = document.getElementById('cad-message');
+  const errBox    = document.getElementById('error-box');
+  const errMsg    = document.getElementById('error-msg');
+  const dlLink    = document.getElementById('download-link');
+
+  let currentFile = null;
+
+  function fmt(n) {
+    if (n < 1024) return n + ' B';
+    if (n < 1024*1024) return (n/1024).toFixed(1) + ' KB';
+    return (n/1024/1024).toFixed(2) + ' MB';
+  }
+
+  function setFile(f) {
+    currentFile = f;
+    if (!f) {
+      fInfo.style.display = 'none';
+      btn.disabled = true;
+      return;
+    }
+    fName.textContent = f.name;
+    fSize.textContent = '（' + fmt(f.size) + '）';
+    fInfo.style.display = '';
+    btn.disabled = false;
+  }
+
+  dz.addEventListener('click', () => fi.click());
+  fi.addEventListener('change', (e) => {
+    if (e.target.files && e.target.files[0]) setFile(e.target.files[0]);
+  });
+  ['dragover','dragenter'].forEach(ev => dz.addEventListener(ev, (e) => {
+    e.preventDefault(); dz.style.background = '#d0e9fa';
+  }));
+  ['dragleave','drop'].forEach(ev => dz.addEventListener(ev, (e) => {
+    e.preventDefault(); dz.style.background = '#e8f4fd';
+  }));
+  dz.addEventListener('drop', (e) => {
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      fi.files = e.dataTransfer.files;
+      setFile(e.dataTransfer.files[0]);
+    }
+  });
+
+  function hideAll() {
+    empty.style.display   = 'none';
+    loading.style.display = 'none';
+    imgWrap.style.display = 'none';
+    cadNote.style.display = 'none';
+    errBox.style.display  = 'none';
+    dlLink.style.display  = 'none';
+    meta.textContent = '';
+  }
+
+  btn.addEventListener('click', async () => {
+    if (!currentFile) return;
+
+    hideAll();
+    loading.style.display = '';
+    btn.disabled = true;
+
+    const fd = new FormData();
+    fd.append('file', currentFile);
+    fd.append('drawing_no', document.getElementById('tb-drawing-no').value);
+    fd.append('title',      document.getElementById('tb-title').value);
+    fd.append('material',   document.getElementById('tb-material').value);
+    fd.append('scale',      document.getElementById('tb-scale').value);
+    fd.append('drawer',     document.getElementById('tb-drawer').value);
+
+    try {
+      const res = await fetch('/title-block/convert', { method:'POST', body: fd });
+      const data = await res.json();
+      hideAll();
+
+      if (!data.ok) {
+        errBox.style.display = '';
+        errMsg.textContent = data.error || '轉換失敗';
+        btn.disabled = false;
+        return;
+      }
+
+      dlLink.href = data.download_url;
+      dlLink.setAttribute('download', data.filename);
+      dlLink.style.display = '';
+
+      if (data.type === 'pdf') {
+        imgWrap.innerHTML = '';
+        const urls = data.preview_urls || [];
+        if (urls.length === 0) {
+          imgWrap.innerHTML = '<div class="text-muted small text-center py-4">預覽圖產生失敗，請直接下載 PDF 查看</div>';
+        } else {
+          urls.forEach((u, i) => {
+            const card = document.createElement('div');
+            card.className = 'mb-3 bg-white shadow-sm rounded overflow-hidden';
+            card.innerHTML =
+              `<div class="small text-muted px-2 py-1 border-bottom bg-light">第 ${i+1} / ${urls.length} 頁</div>` +
+              `<img src="${u}" alt="preview p${i+1}" style="width:100%;height:auto;display:block">`;
+            imgWrap.appendChild(card);
+          });
+        }
+        imgWrap.style.display = '';
+        meta.textContent = `（共 ${data.pages || urls.length} 頁 · 200 DPI 預覽）`;
+      } else {
+        cadName.textContent = data.filename;
+        cadMsg.textContent  = data.message;
+        cadNote.style.display = '';
+      }
+    } catch (err) {
+      hideAll();
+      errBox.style.display = '';
+      errMsg.textContent = '網路或伺服器錯誤：' + err.message;
+    } finally {
+      btn.disabled = false;
+    }
+  });
+})();
+</script>
+{% endblock %}

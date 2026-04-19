@@ -43,6 +43,11 @@
       <i class="bi bi-plus-circle me-2"></i>新建 RFQ 詢價單
     </a>
     {% endif %}
+    {% if user.role.value in ('engineer', 'admin') %}
+    <a href="/title-block/" class="nav-link {% if '/title-block' in request.url.path %}active{% endif %}">
+      <i class="bi bi-border-outer me-2"></i>圖框轉換
+    </a>
+    {% endif %}
 
     {# ── NPI 開發 ── #}
     <div class="text-white-50 px-3 mb-1 mt-3" style="font-size:0.7rem;letter-spacing:1px">NPI 開發</div>

@@ -54,7 +54,8 @@ _RFQ_COLLECT_ROLES = (Role.PURCHASE, Role.ENGINEER, Role.ADMIN)
 
 ATTACH_CATEGORIES = [
     "客戶詢價信", "圖面",
-    "供應商報價", "成本分析表", "客戶報價單",
+    "供應商報價", "議價後報價單",
+    "成本分析表", "客戶報價單",
     "模具請購單", "議價記錄", "其它",
 ]
 
@@ -1068,12 +1069,14 @@ async def save_bargain(
             try: tooling[key[8:]] = float(val)
             except (TypeError, ValueError): pass
     note = (form_data.get("note") or "").strip() or None
+    erp_po_no = (form_data.get("erp_po_no") or "").strip() or None
     form.bargain_data = json.dumps(
-        {"prices": prices, "tooling": tooling, "flags": flags, "note": note},
+        {"prices": prices, "tooling": tooling, "flags": flags,
+         "note": note, "erp_po_no": erp_po_no},
         ensure_ascii=False,
     )
 
-    # 檔案取代：以 (row.process, col.label) 找到對應 invite，替換其 供應商報價
+    # 議價後報價單：依 (row.process, col.label) 對應 invite，存為「議價後報價單」類別顯示於附件區
     if files and form.quote_cost_data:
         try:
             qd = json.loads(form.quote_cost_data)
@@ -1083,7 +1086,6 @@ async def save_bargain(
             qd_rows, qd_cols = [], []
         upload_dir = _upload_dir(form.id)
         for key, up in files.items():
-            # key 形如 r0_c1 → 取出 row_idx / col_idx
             try:
                 rpart, cpart = key.split("_")
                 ri = int(rpart[1:]); ci = int(cpart[1:])
@@ -1098,13 +1100,6 @@ async def save_bargain(
                 if inv.process_name and inv.supplier and inv.process_name == proc_name and inv.supplier.name == col_label:
                     target_inv = inv
                     break
-            if not target_inv:
-                continue
-            # 舊報價單標記為「舊供應商報價」保留歷史
-            for d in form.documents or []:
-                if d.invite_id_fk == target_inv.id and d.category == "供應商報價":
-                    d.category = "舊供應商報價（議價前）"
-            # 寫入新檔案
             content = await up.read()
             if not content:
                 continue
@@ -1114,10 +1109,10 @@ async def save_bargain(
                 fh.write(content)
             db.add(NPIDocument(
                 form_id_fk    = form.id,
-                invite_id_fk  = target_inv.id,
+                invite_id_fk  = target_inv.id if target_inv else None,
                 filename      = saved,
-                original_name = up.filename,
-                category      = "供應商報價",
+                original_name = f"[{proc_name}/{col_label}] {up.filename}",
+                category      = "議價後報價單",
                 uploaded_by   = current_user.id,
             ))
 

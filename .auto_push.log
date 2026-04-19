@@ -2717,3 +2717,23 @@ After doing this, you may fix the identity used for this commit with:
 To github.com:77410kevin-sketch/Honten.git
    bc9b0a2..1e76cc6  main -> main
 [2026-04-19 18:40] ✅ 已自動 push
+[main 73122da] 自動備份 2026-04-19 19:40
+ Committer: kevin <kevin@kevindeMac-mini.local>
+Your name and email address were configured automatically based
+on your username and hostname. Please check that they are accurate.
+You can suppress this message by setting them explicitly. Run the
+following command and follow the instructions in your editor to edit
+your configuration file:
+
+    git config --global --edit
+
+After doing this, you may fix the identity used for this commit with:
+
+    git commit --amend --reset-author
+
+ 5 files changed, 796 insertions(+), 1 deletion(-)
+ create mode 100644 feature/npi-module/app/routes/title_block.py
+ create mode 100644 feature/npi-module/app/templates/title_block/index.html
+To github.com:77410kevin-sketch/Honten.git
+   1e76cc6..73122da  main -> main
+[2026-04-19 19:40] ✅ 已自動 push

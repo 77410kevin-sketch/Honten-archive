@@ -772,7 +772,7 @@
 
               html += '</tbody><tfoot>';
               // footer
-              const footLabelSpan = engView ? 3 : ((buView || pcView) ? 3 : 1);
+              const footLabelSpan = engView ? 2 : ((buView || pcView) ? 3 : 1);
             const fmtRow = (label, key, klass) => {
               let h = `<tr class="${klass||''}"><th class="text-start" colspan="${footLabelSpan}">${label}</th>`;
               cols.forEach(c => h += `<td class="text-end">${c[key]!=null?(typeof c[key]==='number'?c[key].toFixed(2):c[key]):'—'}</td>`);

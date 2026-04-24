@@ -205,13 +205,22 @@ async def parse_inquiry(
 ):
     if current_user.role not in _SALES_ROLES:
         raise HTTPException(status_code=403, detail="只有業務可以使用此功能")
-    from app.services.inquiry_parser import parse_inquiry_letter, extract_text_from_upload
+    from app.services.inquiry_parser import (
+        parse_inquiry_letter, parse_inquiry_image,
+        extract_text_from_upload, _IMAGE_EXTS,
+    )
+    import os
     content = await inquiry_file.read()
     if not content:
         raise HTTPException(status_code=400, detail="檔案為空")
     try:
-        text = extract_text_from_upload(inquiry_file.filename or "upload.txt", content)
-        data = parse_inquiry_letter(text)
+        fname = inquiry_file.filename or "upload.txt"
+        ext = os.path.splitext(fname)[1].lower()
+        if ext in _IMAGE_EXTS:
+            data = parse_inquiry_image(fname, content)
+        else:
+            text = extract_text_from_upload(fname, content)
+            data = parse_inquiry_letter(text)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"解析失敗：{e}")
     return {"ok": True, "data": data}

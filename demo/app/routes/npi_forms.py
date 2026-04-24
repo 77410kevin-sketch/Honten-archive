@@ -993,6 +993,7 @@ async def submit_mould_requisition(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     erp_req_no: str = Form(""),
+    erp_req_data: str = Form(""),   # ERP 查詢結果 JSON snapshot
     attach_files: List[UploadFile] = File(default=[]),
     attach_categories: List[str] = Form(default=[]),
 ):
@@ -1026,8 +1027,9 @@ async def submit_mould_requisition(
             status_code=400,
             detail=f"以下站別尚未填寫模具料號：{', '.join(missing)}",
         )
-    # 儲存 ERP 單號 + 附件
-    form.erp_req_no = erp_req_no
+    # 儲存 ERP 單號 + 查詢 snapshot + 附件
+    form.erp_req_no   = erp_req_no
+    form.erp_req_data = erp_req_data.strip() or None
     if attach_files and any(f.filename for f in attach_files):
         await _save_attachments(db, form.id, current_user.id, attach_files, attach_categories)
     form.updated_at = datetime.utcnow()

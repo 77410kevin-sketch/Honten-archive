@@ -1156,6 +1156,8 @@
           {% if _ns.procs %}
           <form method="post" action="/npi-forms/{{ form.form_id }}/submit-mould-requisition"
                 enctype="multipart/form-data" id="mouldReqForm">
+            {# ERP 查詢結果 snapshot（JS 填入）#}
+            <input type="hidden" name="erp_req_data" id="erpReqDataInput" value="{{ form.erp_req_data or '' }}">
             <table class="table table-sm table-bordered align-middle mb-0">
               <thead class="table-light">
                 <tr>
@@ -1263,9 +1265,53 @@
               </button>
             </div>
             {% elif form.erp_req_no %}
-            <div class="alert alert-success small mb-0 py-2">
+            <div class="alert alert-success small mb-2 py-2">
               <i class="bi bi-check-circle me-1"></i>已送出 ERP 請購單 <strong>{{ form.erp_req_no }}</strong>。
             </div>
+            {# 已儲存的 ERP 明細（留存在工作區）#}
+            {% if form.erp_req_data %}
+            {% set _erp_rows = form.erp_req_data | fromjson if form.erp_req_data else [] %}
+            {% if _erp_rows and _erp_rows is iterable %}
+            <div class="card border-primary-subtle mb-0">
+              <div class="card-header bg-primary-subtle py-2 d-flex justify-content-between align-items-center">
+                <span class="fw-semibold text-primary small">
+                  <i class="bi bi-table me-1"></i>ERP 請購單明細（已確認留存）
+                </span>
+                <span class="badge bg-primary">{{ form.erp_req_no }}</span>
+              </div>
+              <div class="card-body p-0">
+                <div class="table-responsive">
+                  <table class="table table-sm table-bordered mb-0 align-middle">
+                    <thead class="table-primary">
+                      <tr>
+                        {% for k in _erp_rows[0].keys() %}<th class="small">{{ k }}</th>{% endfor %}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% set _erp_total = namespace(v=0) %}
+                      {% for row in _erp_rows %}
+                      <tr>
+                        {% for k, v in row.items() %}
+                        <td class="small {% if k == '金額' %}fw-bold text-end{% elif k in ('單價','請購數量') %}text-end{% endif %}">
+                          {{ v if v is not none else '—' }}
+                        </td>
+                        {% if k == '金額' and v %}{% set _erp_total.v = _erp_total.v + (v | float) %}{% endif %}
+                        {% endfor %}
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                    <tfoot class="table-warning fw-bold">
+                      <tr>
+                        <td colspan="{{ (_erp_rows[0].keys() | list | length) - 1 }}" class="text-end">模治具請購合計</td>
+                        <td class="text-end">{{ '%.2f' | format(_erp_total.v) }}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            </div>
+            {% endif %}
+            {% endif %}
             {% elif _bu_like_view %}
             <div class="alert alert-warning small mb-0 py-2">
               <i class="bi bi-hourglass-split me-1"></i>工程尚未送出模治具請購單。
@@ -3038,13 +3084,31 @@ async function _doErpLookup(reqNo, btn) {
     const badge  = document.getElementById('erpReqBadge');
 
     headRow.innerHTML = '<tr>' + Object.keys(rows[0]).map(k => `<th>${k}</th>`).join('') + '</tr>';
+
+    // 計算金額加總
+    const totalAmt = rows.reduce((s, r) => s + (parseFloat(r['金額']) || 0), 0);
     body.innerHTML = rows.map(row =>
-      '<tr>' + Object.values(row).map(v => `<td>${v ?? '—'}</td>`).join('') + '</tr>'
+      '<tr>' + Object.entries(row).map(([k,v]) =>
+        `<td class="${['金額','單價','請購數量'].includes(k) ? 'text-end' : ''} ${k==='金額'?'fw-bold':''}">${v ?? '—'}</td>`
+      ).join('') + '</tr>'
     ).join('');
+
+    // 加總列
+    const colCount = Object.keys(rows[0]).length;
+    body.innerHTML += `<tr class="table-warning fw-bold">
+      <td colspan="${colCount - 1}" class="text-end">模治具請購合計</td>
+      <td class="text-end">${totalAmt.toFixed(2)}</td>
+    </tr>`;
 
     badge.textContent = `共 ${rows.length} 筆品項`;
     document.getElementById('erpReqResult').style.display = '';
     document.getElementById('erpReqResult').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    // 自動存入 hidden input（送出時一起儲存）
+    const hiddenInput = document.getElementById('erpReqDataInput');
+    if (hiddenInput) {
+      hiddenInput.value = JSON.stringify(rows);
+    }
   } catch(e) {
     const errDiv = document.getElementById('erpReqError');
     document.getElementById('erpReqErrorMsg').textContent = e.message;

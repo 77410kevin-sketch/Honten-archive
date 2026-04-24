@@ -1531,6 +1531,23 @@ async def detail_npi(
     })
 
 
+# ── ERP 請購單即時查詢 ───────────────────────
+
+@router.get("/erp-req-lookup")
+async def erp_req_lookup(
+    req_no: str,
+    current_user: User = Depends(get_current_user),
+):
+    """依請購單號即時查詢 ERP 明細，回 JSON 供前端渲染。"""
+    from app.services.erp_client import erp_query_purchase_requisition
+    if not req_no or not req_no.strip():
+        raise HTTPException(status_code=400, detail="請填寫請購單號")
+    rows = erp_query_purchase_requisition(req_no.strip())
+    if not rows:
+        raise HTTPException(status_code=404, detail=f"ERP 找不到請購單：{req_no}")
+    return {"ok": True, "req_no": req_no.strip(), "rows": rows}
+
+
 # ── 手動跟催入口（admin 測試用）─────────────
 
 @router.post("/_run-reminders")

@@ -198,6 +198,27 @@ class _SQLServerBackend:
             ORDER BY order_date DESC
         """)
 
+    def query_purchase_requisition(self, req_no: str) -> list[dict]:
+        """依請購單號查詢 ERP 請購單明細。"""
+        safe_no = req_no.strip().replace("'", "''")
+        return self._query(f"""
+            SELECT
+                req_no          AS 請購單號,
+                req_date        AS 請購日期,
+                req_dept        AS 請購部門,
+                product_code    AS 品號,
+                product_name    AS 品名,
+                product_spec    AS 規格,
+                qty             AS 請購數量,
+                unit_price      AS 單價,
+                amount          AS 金額,
+                vendor_name     AS 供應廠商,
+                purchase_order_no AS 對應採購單
+            FROM v_ht_purchase_requisition
+            WHERE RTRIM(req_no) = N'{safe_no}'
+            ORDER BY req_no
+        """)
+
 
 # ── Stub fallback ──────────────────────────────────
 def _stub_customers() -> list[ERPCustomer]:
@@ -296,4 +317,24 @@ def erp_query_purchase_orders(days: int = 30) -> list[dict]:
 def erp_query_manufacturing_orders(part_no: str = "") -> list[dict]:
     if isinstance(_BACKEND, _SQLServerBackend):
         return _BACKEND.query_manufacturing_orders(part_no)
+    return []
+
+
+def erp_query_purchase_requisition(req_no: str) -> list[dict]:
+    """查單一請購單明細，回傳 list[dict]（每列一個品項）。"""
+    if isinstance(_BACKEND, _SQLServerBackend):
+        try:
+            rows = _BACKEND.query_purchase_requisition(req_no)
+            # 將 Decimal 轉 float 方便 JSON 序列化
+            result = []
+            for row in rows:
+                clean = {}
+                for k, v in row.items():
+                    from decimal import Decimal
+                    clean[k] = float(v) if isinstance(v, Decimal) else v
+                result.append(clean)
+            return result
+        except Exception as e:
+            logger.error(f"query_purchase_requisition 失敗: {e}")
+            return []
     return []

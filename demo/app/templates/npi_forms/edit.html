@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}編輯 {{ form.form_id }}{% endblock %}
+{% block content %}
+<div class="container py-4" style="max-width: 960px">
+  <h4 class="mb-3">
+    <i class="bi bi-pencil-square me-2 text-primary"></i>編輯 {{ form.form_id }}
+    <span class="badge bg-secondary ms-2">{{ form.status.value }}</span>
+  </h4>
+
+  <form method="post" action="/npi-forms/{{ form.form_id }}/edit" enctype="multipart/form-data">
+    <div class="card shadow-sm mb-3">
+      <div class="card-header bg-white fw-semibold">客戶資訊</div>
+      <div class="card-body row g-3">
+        <div class="col-md-6">
+          <label class="form-label">客戶名稱</label>
+          <input name="customer_name" class="form-control" value="{{ form.customer_name }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">客戶聯絡人</label>
+          <input name="customer_contact" class="form-control" value="{{ form.customer_contact or '' }}">
+        </div>
+        <div class="col-md-8">
+          <label class="form-label">客戶 Email</label>
+          <input name="customer_email" type="email" class="form-control" value="{{ form.customer_email or '' }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">客戶回覆期限</label>
+          <input name="rfq_due_date" type="date" class="form-control" value="{{ form.rfq_due_date or '' }}">
+        </div>
+      </div>
+    </div>
+
+    <div class="card shadow-sm mb-3">
+      <div class="card-header bg-white fw-semibold">產品資訊</div>
+      <div class="card-body row g-3">
+        <div class="col-md-6">
+          <label class="form-label">產品名稱</label>
+          <input name="product_name" class="form-control" value="{{ form.product_name }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">型號</label>
+          <input name="product_model" class="form-control" value="{{ form.product_model or '' }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">目標單價</label>
+          <input name="target_price" type="number" step="0.01" class="form-control" value="{{ form.target_price or '' }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">年需求量</label>
+          <input name="annual_qty" type="number" class="form-control" value="{{ form.annual_qty or '' }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">事業部</label>
+          <select name="bu" class="form-select">
+            <option value="">—</option>
+            <option value="儲能事業部" {% if form.bu == '儲能事業部' %}selected{% endif %}>儲能事業部</option>
+            <option value="消費性事業部" {% if form.bu == '消費性事業部' %}selected{% endif %}>消費性事業部</option>
+          </select>
+        </div>
+        <div class="col-12">
+          <label class="form-label">規格摘要</label>
+          <textarea name="spec_summary" rows="3" class="form-control">{{ form.spec_summary or '' }}</textarea>
+        </div>
+        <div class="col-12">
+          <label class="form-label">業務補充資訊</label>
+          <textarea name="sales_note" rows="3" class="form-control">{{ form.sales_note or '' }}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="card shadow-sm mb-3">
+      <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+        <span>已上傳附件</span>
+      </div>
+      <div class="card-body">
+        {% for cat, docs in docs_by_cat.items() %}
+        <div class="mb-2">
+          <div class="fw-semibold small text-primary mb-1">{{ cat }}</div>
+          {% for d in docs %}
+          <div class="d-flex justify-content-between align-items-center border-bottom py-1">
+            <a href="/npi-forms/doc/preview/{{ d.id }}" target="_blank" class="small">
+              <i class="bi bi-paperclip me-1"></i>{{ d.original_name }}
+            </a>
+            <form method="post" action="/npi-forms/{{ form.form_id }}/delete-doc/{{ d.id }}">
+              <button class="btn btn-sm btn-outline-danger"><i class="bi bi-x"></i></button>
+            </form>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-muted small">尚未上傳任何附件</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card shadow-sm mb-3">
+      <div class="card-header bg-white fw-semibold">上傳新附件</div>
+      <div class="card-body">
+        <div id="attach-rows">
+          <div class="row g-2 mb-2 attach-row align-items-center">
+            <div class="col-md-3">
+              <select name="attach_categories" class="form-select">
+                {% for c in ATTACH_CATEGORIES %}
+                <option>{{ c }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-8">
+              <div class="d-flex align-items-center gap-2 flex-wrap file-picker-wrap">
+                <label class="btn btn-outline-secondary btn-sm mb-0">
+                  <i class="bi bi-paperclip me-1"></i>選擇檔案
+                  <input type="file" name="attach_files" class="d-none">
+                </label>
+                <span class="file-picker-name text-muted small">（尚未選擇）</span>
+              </div>
+            </div>
+            <div class="col-md-1">
+              <button type="button" class="btn btn-sm btn-outline-danger remove-row">
+                <i class="bi bi-x"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+        <button type="button" id="add-attach" class="btn btn-sm btn-outline-primary">
+          <i class="bi bi-plus"></i>增加一筆
+        </button>
+      </div>
+    </div>
+
+    <div class="d-flex justify-content-end gap-2">
+      <a href="/npi-forms/{{ form.form_id }}" class="btn btn-outline-secondary">取消</a>
+      <button class="btn btn-primary">儲存</button>
+    </div>
+  </form>
+</div>
+
+<script>
+document.getElementById("add-attach").addEventListener("click", () => {
+  const first = document.querySelector(".attach-row");
+  const clone = first.cloneNode(true);
+  const fInput = clone.querySelector('input[type=file]');
+  if (fInput) fInput.value = "";
+  const nm = clone.querySelector('.file-picker-name');
+  if (nm) nm.textContent = '（尚未選擇）';
+  document.getElementById("attach-rows").appendChild(clone);
+});
+document.addEventListener("click", (e) => {
+  if (e.target.closest(".remove-row")) {
+    const rows = document.querySelectorAll(".attach-row");
+    if (rows.length > 1) e.target.closest(".attach-row").remove();
+  }
+});
+</script>
+{% endblock %}

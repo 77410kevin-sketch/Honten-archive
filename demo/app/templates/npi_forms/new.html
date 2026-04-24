@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+{% block title %}新建 NPI/RFQ{% endblock %}
+{% block content %}
+<div class="container py-4" style="max-width: 960px">
+  <h4 class="mb-3"><i class="bi bi-plus-circle me-2 text-primary"></i>新建 NPI/RFQ 單（業務詢價）</h4>
+
+  {# ── 🧠 AI 智慧解析詢價信 ── #}
+  <div class="card shadow-sm mb-3 border-primary">
+    <div class="card-header bg-primary text-white fw-semibold">
+      <i class="bi bi-stars me-2"></i>🧠 智慧解析詢價信（AI 自動填欄位）
+    </div>
+    <div class="card-body">
+      <p class="small text-muted mb-2">
+        上傳客戶寄來的詢價信（<strong>.txt / .pdf / .eml</strong>），AI 會自動擷取客戶、產品、規格、數量、期限等欄位填入下方表格，業務確認後再送出。
+      </p>
+      <div class="d-flex align-items-center gap-2 flex-wrap file-picker-wrap">
+        <label class="btn btn-outline-primary mb-0">
+          <i class="bi bi-upload me-1"></i>選擇詢價信檔案
+          <input type="file" id="aiInquiryFile" class="d-none" accept=".txt,.pdf,.eml,.msg">
+        </label>
+        <span class="file-picker-name text-muted small flex-grow-1">（尚未選擇）</span>
+        <button type="button" class="btn btn-primary" id="aiParseBtn">
+          <i class="bi bi-magic me-1"></i>解析並填入
+        </button>
+      </div>
+      <div id="aiStatus" class="small mt-2"></div>
+    </div>
+  </div>
+
+  <form method="post" action="/npi-forms/new" enctype="multipart/form-data" id="npiForm">
+    <div class="card shadow-sm mb-3">
+      <div class="card-header bg-white fw-semibold"><i class="bi bi-person-lines-fill me-2"></i>客戶資訊</div>
+      <div class="card-body row g-3">
+        <div class="col-md-6">
+          <label class="form-label">客戶名稱 <span class="text-danger">*</span></label>
+          <input name="customer_name" class="form-control" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">客戶聯絡人</label>
+          <input name="customer_contact" class="form-control">
+        </div>
+        <div class="col-md-8">
+          <label class="form-label">客戶 Email <small class="text-muted">(報價完成後寄送對象)</small></label>
+          <input name="customer_email" type="email" class="form-control">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">客戶回覆期限</label>
+          <input name="rfq_due_date" type="date" class="form-control">
+        </div>
+      </div>
+    </div>
+
+    <div class="card shadow-sm mb-3">
+      <div class="card-header bg-white fw-semibold"><i class="bi bi-box me-2"></i>產品資訊</div>
+      <div class="card-body row g-3">
+        <div class="col-md-6">
+          <label class="form-label">產品名稱 <span class="text-danger">*</span></label>
+          <input name="product_name" class="form-control" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">型號</label>
+          <input name="product_model" class="form-control">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">目標單價</label>
+          <input name="target_price" type="number" step="0.01" class="form-control">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">年需求量</label>
+          <input name="annual_qty" type="number" class="form-control">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">事業部</label>
+          <select name="bu" class="form-select">
+            <option value="">—</option>
+            <option value="儲能事業部">儲能事業部</option>
+            <option value="消費性事業部">消費性事業部</option>
+          </select>
+        </div>
+        <div class="col-12">
+          <label class="form-label">規格摘要</label>
+          <textarea name="spec_summary" rows="3" class="form-control"></textarea>
+        </div>
+        <div class="col-12">
+          <label class="form-label">業務補充資訊</label>
+          <textarea name="sales_note" rows="3" class="form-control"
+                    placeholder="客戶背景、決策時程、特殊需求…"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="card shadow-sm mb-3">
+      <div class="card-header bg-white fw-semibold"><i class="bi bi-paperclip me-2"></i>附件上傳</div>
+      <div class="card-body">
+        <p class="small text-muted mb-3">
+          送審時須至少包含【客戶詢價信】與【規格書或圖面】其一。
+        </p>
+        <div id="attach-rows">
+          <div class="row g-2 mb-2 attach-row align-items-center">
+            <div class="col-md-3">
+              <select name="attach_categories" class="form-select">
+                <option>客戶詢價信</option>
+                <option>規格書</option>
+                <option>圖面</option>
+                <option>其它</option>
+              </select>
+            </div>
+            <div class="col-md-8">
+              <div class="d-flex align-items-center gap-2 flex-wrap file-picker-wrap">
+                <label class="btn btn-outline-secondary btn-sm mb-0">
+                  <i class="bi bi-paperclip me-1"></i>選擇檔案
+                  <input type="file" name="attach_files" class="d-none">
+                </label>
+                <span class="file-picker-name text-muted small">（尚未選擇）</span>
+              </div>
+            </div>
+            <div class="col-md-1">
+              <button type="button" class="btn btn-sm btn-outline-danger remove-row">
+                <i class="bi bi-x"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+        <button type="button" id="add-attach" class="btn btn-sm btn-outline-primary">
+          <i class="bi bi-plus"></i>增加一筆附件
+        </button>
+      </div>
+    </div>
+
+    <div class="d-flex justify-content-end gap-2">
+      <a href="/npi-forms/" class="btn btn-outline-secondary">取消</a>
+      <button class="btn btn-primary">儲存草稿</button>
+    </div>
+  </form>
+</div>
+
+<script>
+document.getElementById("add-attach").addEventListener("click", () => {
+  const first = document.querySelector(".attach-row");
+  const clone = first.cloneNode(true);
+  const fInput = clone.querySelector('input[type=file]');
+  if (fInput) fInput.value = "";
+  const nm = clone.querySelector('.file-picker-name');
+  if (nm) nm.textContent = '（尚未選擇）';
+  document.getElementById("attach-rows").appendChild(clone);
+});
+document.addEventListener("click", (e) => {
+  if (e.target.closest(".remove-row")) {
+    const rows = document.querySelectorAll(".attach-row");
+    if (rows.length > 1) e.target.closest(".attach-row").remove();
+  }
+});
+
+// ── 🧠 AI 智慧解析詢價信 ──
+document.getElementById("aiParseBtn").addEventListener("click", async () => {
+  const fileInput = document.getElementById("aiInquiryFile");
+  const status = document.getElementById("aiStatus");
+  const btn = document.getElementById("aiParseBtn");
+  if (!fileInput.files.length) {
+    status.innerHTML = '<span class="text-danger">請先選擇詢價信檔案</span>';
+    return;
+  }
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>AI 解析中…';
+  status.innerHTML = '<span class="text-muted">AI 正在讀取內容並擷取欄位（約 2-5 秒）…</span>';
+
+  const fd = new FormData();
+  fd.append("inquiry_file", fileInput.files[0]);
+  try {
+    const resp = await fetch("/npi-forms/_parse-inquiry", { method: "POST", body: fd });
+    const j = await resp.json();
+    if (!resp.ok) throw new Error(j.detail || resp.statusText);
+    fillFields(j.data);
+    status.innerHTML = '<span class="text-success"><i class="bi bi-check-circle me-1"></i>解析完成！已自動填入欄位，請確認後送出。</span>';
+  } catch (err) {
+    status.innerHTML = '<span class="text-danger"><i class="bi bi-exclamation-triangle me-1"></i>' + err.message + '</span>';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-magic me-1"></i>解析並填入';
+  }
+});
+
+function fillFields(data) {
+  const map = {
+    customer_name: data.customer_name,
+    customer_contact: data.customer_contact,
+    customer_email: data.customer_email,
+    product_name: data.product_name,
+    product_model: data.product_model,
+    spec_summary: data.spec_summary,
+    target_price: data.target_price,
+    annual_qty: data.annual_qty,
+    rfq_due_date: data.rfq_due_date,
+    sales_note: data.sales_note,
+  };
+  Object.entries(map).forEach(([k, v]) => {
+    if (v === null || v === undefined || v === "UNKNOWN") return;
+    const el = document.querySelector(`[name="${k}"]`);
+    if (el) {
+      el.value = v;
+      el.classList.add("border-primary"); // 標示被 AI 填入
+      setTimeout(() => el.classList.remove("border-primary"), 3000);
+    }
+  });
+  // 事業部 select
+  if (data.bu) {
+    const buSel = document.querySelector('[name="bu"]');
+    if (buSel) buSel.value = data.bu;
+  }
+}
+</script>
+{% endblock %}

@@ -11,8 +11,10 @@ from sqlalchemy import select, text
 from app.database import engine, Base, AsyncSessionLocal
 from app.models.user import User, Role, BU
 from app.models.pcn_form import PCNForm, PCNDocument, PCNApproval
+from app.models.supplier import Supplier
+from app.models.npi_form import NPIForm, NPIDocument, NPIApproval, NPISupplierInvite
 from app.services.auth import hash_password
-from app.routes import auth, pcn_forms, drawing_checker
+from app.routes import auth, pcn_forms, drawing_checker, npi_forms, suppliers
 
 
 # ── Seed 初始資料 ────────────────────────────────
@@ -51,6 +53,10 @@ async def seed_users():
 async def run_migrations():
     """補齊新欄位（ALTER TABLE IF NOT EXISTS 等效）"""
     migrations = [
+        # NPI 報價試算欄位
+        "ALTER TABLE npi_forms ADD COLUMN quote_cost_data TEXT",
+        "ALTER TABLE npi_forms ADD COLUMN quoted_unit_price FLOAT",
+        "ALTER TABLE npi_forms ADD COLUMN bu_quote_note TEXT",
         # PCNApproval 退回對象欄位
         "ALTER TABLE pcn_approvals ADD COLUMN reject_target VARCHAR(50)",
         # ECN 設計變更庫存盤點
@@ -107,6 +113,8 @@ async def db_session_middleware(request: Request, call_next):
 app.include_router(auth.router)
 app.include_router(pcn_forms.router)
 app.include_router(drawing_checker.router)
+app.include_router(npi_forms.router)
+app.include_router(suppliers.router)
 
 
 @app.get("/")

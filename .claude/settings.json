@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-Process *)",
+      "PowerShell(Get-NetTCPConnection *)",
+      "PowerShell(Get-OdbcDriver *)",
+      "PowerShell(Stop-Process *)",
+      "Bash(curl -s -o /dev/null *)",
+      "Bash(curl -s -o /dev/null -w *)",
+      "Bash(netstat -ano *)",
+      "Bash(ipconfig *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(git pull *)",
+      "Bash(git checkout *)",
+      "Bash(git merge *)",
+      "Bash(git stash *)",
+      "Bash(python -m uvicorn *)",
+      "Bash(python -m pip *)",
+      "Bash(python -c *)",
+      "Bash(python3 -c *)",
+      "Bash(pip install *)",
+      "Bash(uvicorn *)"
+    ]
+  }
+}

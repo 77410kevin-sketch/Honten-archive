@@ -1,0 +1,70 @@
+{
+  "form_id": "RFQ-20260424-002",
+  "customer_name": "Dynapack International Technology Corp.",
+  "product_name": "DG110U",
+  "product_model": "DG110U",
+  "quoted_unit_price": 193.2,
+  "cost_analysis_note": null,
+  "bu_quote_note": "核准報價",
+  "quote_cost_data": {
+    "columns": [
+      {
+        "label": "DG110U_Case_top_asm_20260303.STEP",
+        "subtotal": 140,
+        "defect_amount": 7,
+        "overhead_amount": 9.8,
+        "qa_ship_amount": 4.2,
+        "tooling_cost": 35000,
+        "tooling_profit_rate": 0.3,
+        "tooling_profit_amount": 10500,
+        "tooling_quote": 45500,
+        "cost_total": 161,
+        "profit_rate": 0.2,
+        "profit_amount": 32.2,
+        "quote": 193.2
+      },
+      {
+        "label": "DG110U_Case_Bottom_asm_20260304.STEP",
+        "subtotal": 200,
+        "defect_amount": 10,
+        "overhead_amount": 14,
+        "qa_ship_amount": 6,
+        "tooling_cost": 1800,
+        "tooling_profit_rate": 0.3,
+        "tooling_profit_amount": 540,
+        "tooling_quote": 2340,
+        "cost_total": 230,
+        "profit_rate": 0.2,
+        "profit_amount": 46,
+        "quote": 276
+      }
+    ],
+    "rows": [
+      {
+        "process": "沖壓",
+        "prices": [
+          40,
+          100
+        ]
+      },
+      {
+        "process": "陽極",
+        "prices": [
+          100,
+          null
+        ]
+      },
+      {
+        "process": "CNC",
+        "prices": [
+          null,
+          100
+        ]
+      }
+    ],
+    "defect_rate": 0.05,
+    "overhead_rate": 0.07,
+    "qa_ship_rate": 0.03
+  },
+  "approved_at": "2026-04-24T01:40:02.436108"
+}

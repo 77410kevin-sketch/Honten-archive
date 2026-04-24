@@ -1,0 +1,63 @@
+{
+  "form_id": "RFQ-20260424-001",
+  "customer_name": "Dynapack International Technology Corp.",
+  "product_name": "DG110U",
+  "product_model": "DG110U",
+  "quoted_unit_price": 105.8,
+  "cost_analysis_note": null,
+  "bu_quote_note": "核准報價",
+  "quote_cost_data": {
+    "columns": [
+      {
+        "label": "DG110U_Case_Bottom_asm_20260304.STEP",
+        "subtotal": 80,
+        "defect_amount": 4,
+        "overhead_amount": 5.6,
+        "qa_ship_amount": 2.4,
+        "tooling_cost": 60,
+        "tooling_profit_rate": 0.15,
+        "tooling_profit_amount": 9,
+        "tooling_quote": 69,
+        "cost_total": 92,
+        "profit_rate": 0.15,
+        "profit_amount": 13.8,
+        "quote": 105.8
+      },
+      {
+        "label": "DG110U_Case_top_asm_20260303.STEP",
+        "subtotal": 3300,
+        "defect_amount": 165,
+        "overhead_amount": 231,
+        "qa_ship_amount": 99,
+        "tooling_cost": 220,
+        "tooling_profit_rate": 0.15,
+        "tooling_profit_amount": 33,
+        "tooling_quote": 253,
+        "cost_total": 3795,
+        "profit_rate": 0.15,
+        "profit_amount": 569.25,
+        "quote": 4364.25
+      }
+    ],
+    "rows": [
+      {
+        "process": "NCT",
+        "prices": [
+          50,
+          300
+        ]
+      },
+      {
+        "process": "髮線",
+        "prices": [
+          30,
+          3000
+        ]
+      }
+    ],
+    "defect_rate": 0.05,
+    "overhead_rate": 0.07,
+    "qa_ship_rate": 0.03
+  },
+  "approved_at": "2026-04-24T00:50:09.944235"
+}

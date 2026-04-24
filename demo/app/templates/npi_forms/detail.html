@@ -1542,22 +1542,9 @@
           </form>
           {% endif %}
 
-          {# 工程：送 BU（直接送出，多家時顯示供應商選擇）#}
+          {# 工程：送 BU 直接送出 #}
           {% if form.status.value == 'NPI_STARTED' and user.role.value in ('engineer','admin') %}
-          {% set _replied_invites = form.invites | selectattr('replied_at') | list %}
           <form method="post" action="/npi-forms/{{ form.form_id }}/submit-bu" class="mb-2">
-            {% if _replied_invites | length > 1 %}
-            <select name="selected_invite_id" class="form-select form-select-sm mb-2" required>
-              <option value="">— 選用供應商 —</option>
-              {% for inv in _replied_invites %}
-              <option value="{{ inv.id }}">
-                {{ inv.supplier.name if inv.supplier else '' }}
-                ／報價 {{ inv.quote_amount or '—' }}
-                ／交期 {{ inv.lead_time_days or '—' }} 天
-              </option>
-              {% endfor %}
-            </select>
-            {% endif %}
             <button class="btn btn-primary w-100">
               <i class="bi bi-send-check me-1"></i>送 BU 核准
             </button>

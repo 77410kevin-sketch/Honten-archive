@@ -683,22 +683,26 @@
               if (buView || pcView) html += '<th style="width:120px;white-space:nowrap">廠內料號</th>';
               eCols.forEach((c, i) => {
                 const badge = (i === eSelIdx) ? ' <span class="badge bg-warning text-dark">採用</span>' : '';
-                const full = c.label || ('方案 '+(i+1));
+                const full = c.label || ('機種 '+(i+1));
                 const short = full.length > 20 ? full.slice(0,18)+'…' : full;
                 if (engView) {
-                  html += `<th class="text-center" style="min-width:110px" title="${full}">
-                    <input type="text" class="form-control form-control-sm text-center"
-                           value="${full}"
-                           onchange="editData.columns[${i}].label=this.value"
-                           placeholder="供應商名稱">${badge}</th>`;
+                  html += `<th class="text-center" style="min-width:120px" title="${full}">
+                    <div class="d-flex align-items-center gap-1">
+                      <input type="text" class="form-control form-control-sm text-center flex-grow-1"
+                             value="${full}"
+                             onchange="editData.columns[${i}].label=this.value"
+                             placeholder="機種名稱">
+                      <button type="button" class="btn btn-outline-danger btn-sm py-0 px-1 flex-shrink-0"
+                              onclick="removeCol(${i})" title="刪除此機種欄">✕</button>
+                    </div>${badge}</th>`;
                 } else {
                   html += `<th class="text-center" style="min-width:90px" title="${full}">${short}${badge}</th>`;
                 }
               });
               if (engView) {
-                html += `<th class="text-center" style="width:50px">
-                  <button type="button" class="btn btn-outline-success btn-sm py-0 px-1" title="新增供應商"
-                          onclick="addSupplierCol()">＋廠</button></th>`;
+                html += `<th class="text-center" style="width:60px">
+                  <button type="button" class="btn btn-outline-success btn-sm py-0 px-1 w-100" title="新增機種成本欄"
+                          onclick="addModelCol()">＋機種</button></th>`;
                 html += '<th class="text-end" style="width:100px;white-space:nowrap">站別模治具</th>';
                 html += '<th style="width:120px;white-space:nowrap">模具料號</th>';
               }
@@ -822,6 +826,12 @@
                   const tpn = (saved.tool_part_no || '').replace(/"/g,'&quot;');
                   const tBadge = tpn ? `<span class="badge bg-info-subtle text-info">${tpn}</span>` : '<span class="text-muted">—</span>';
                   html += `<td>${tBadge}</td>`;
+                }
+                if (engView) {
+                  html += `<td>
+                    <button type="button" class="btn btn-outline-danger btn-sm py-0 w-100"
+                            onclick="removeRow(${rowIdx})" title="刪除此製程列">✕ 刪除</button>
+                  </td>`;
                 }
                 html += '</tr>';
               });
@@ -1141,9 +1151,19 @@
             editData.rows.push({ process: name, prices });
             renderCostTable();
           };
-          window.addSupplierCol = function() {
-            editData.columns.push({ label: '新供應商', subtotal: 0, cost_total: 0, quote: 0 });
+          window.addModelCol = function() {
+            editData.columns.push({ label: '新機種', subtotal: 0, cost_total: 0, quote: 0 });
             editData.rows.forEach(r => r.prices.push(null));
+            renderCostTable();
+          };
+          window.removeCol = function(ci) {
+            if (editData.columns.length <= 1) { alert('至少需保留一個機種欄'); return; }
+            editData.columns.splice(ci, 1);
+            editData.rows.forEach(r => { if (r.prices) r.prices.splice(ci, 1); });
+            renderCostTable();
+          };
+          window.removeRow = function(ri) {
+            editData.rows.splice(ri, 1);
             renderCostTable();
           };
           window.saveCostData = async function() {

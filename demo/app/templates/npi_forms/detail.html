@@ -1228,25 +1228,6 @@
                        value="{{ _bd_po.erp_po_no or '' }}"
                        placeholder="例：MP-20260419-001">
               </div>
-              {% else %}
-              <div class="col">
-                <label class="form-label mb-1 fw-semibold">
-                  附件（ERP 截圖 / 廠商報價 PDF）
-                  {% if not form.erp_req_no %}<span class="text-danger">*</span>{% endif %}
-                </label>
-                <input type="hidden" name="attach_categories" value="模具請購單">
-                <input type="file" name="attach_files" class="form-control form-control-sm"
-                       {% if form.erp_req_no %}disabled{% endif %}>
-                {% if _mould_docs %}
-                <div class="mt-1">
-                  {% for d in _mould_docs %}
-                  <a href="/npi-forms/doc/preview/{{ d.id }}" target="_blank" class="me-2 small">
-                    <i class="bi bi-paperclip"></i>{{ d.original_name | truncate(22, True) }}
-                  </a>
-                  {% endfor %}
-                </div>
-                {% endif %}
-              </div>
               {% endif %}
             </div>
 

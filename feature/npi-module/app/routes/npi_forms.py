@@ -162,6 +162,9 @@ def _needs_reeval(form: NPIForm) -> bool:
 
 # ── 列表 ────────────────────────────────────────
 
+_NPI_VIEW_ROLES = (Role.SALES, Role.ENGINEER, Role.PURCHASE, Role.BU, Role.ENG_MGR, Role.ADMIN)
+
+
 @router.get("/", response_class=HTMLResponse)
 async def list_npi(
     request: Request,
@@ -170,6 +173,8 @@ async def list_npi(
     current_user: User = Depends(get_current_user),
 ):
     """列表 — 可用 ?stage=RFQ / ?stage=NPI 將 RFQ 詢價與 NPI 開發流程切開顯示。"""
+    if current_user.role not in _NPI_VIEW_ROLES:
+        raise HTTPException(status_code=403, detail="您的角色無權限存取 RFQ / NPI 流程")
     q = (
         select(NPIForm)
         .options(selectinload(NPIForm.creator))
@@ -917,10 +922,18 @@ async def finish_quotes(
         raise HTTPException(status_code=400)
     if current_user.role not in _RFQ_COLLECT_ROLES:
         raise HTTPException(status_code=403, detail="只有採購 / 工程可宣告報價收齊")
+    # 至少要有 1 家供應商已回報價，否則業務拿不到任何單價可試算
+    replied = sum(1 for inv in (form.invites or []) if inv.replied_at and inv.quote_amount)
+    if replied < 1:
+        raise HTTPException(
+            status_code=400,
+            detail="尚無任何供應商回報價，無法宣告收齊；請先請工程/採購跟催"
+        )
     old = form.status
     form.status = NPIFormStatus.QUOTES_COLLECTED
     form.updated_at = datetime.utcnow()
-    db.add(_log_approval(form, current_user, "FINISH_QUOTES", old, form.status, comment))
+    db.add(_log_approval(form, current_user, "FINISH_QUOTES", old, form.status,
+                         comment or f"已收齊 {replied} 家供應商報價"))
     await db.commit()
     await notif._notify_roles(db, [Role.SALES],
                              f"【RFQ 報價已收齊】{form.form_id} - 請上線試算成本並送 BU 審核")
@@ -1273,6 +1286,13 @@ async def save_t1_plan(
     is_purch = current_user.role in (Role.PURCHASE, Role.ADMIN)
     if not (is_sales or is_purch):
         raise HTTPException(status_code=403, detail="僅業務 / 採購可維護 T1 計畫")
+    # T1 屬 NPI 階段資料；DRAFT/RFQ 階段禁寫，避免污染後續流程
+    if form.stage != NPIStage.NPI or form.status not in (
+        NPIFormStatus.NPI_STARTED,
+        NPIFormStatus.NPI_PENDING_BU,
+        NPIFormStatus.NPI_PENDING_PURCHASE,
+    ):
+        raise HTTPException(status_code=400, detail="目前狀態無法編輯 T1 計畫")
     form_data = await request.form()
     ids = form_data.getlist("drawing_id")
     t1_dates = form_data.getlist("t1_date")
@@ -1967,6 +1987,8 @@ async def detail_npi(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if current_user.role not in _NPI_VIEW_ROLES:
+        raise HTTPException(status_code=403, detail="您的角色無權限存取 RFQ / NPI 流程")
     form = await _get_form_or_404(form_id, db)
     # 列可選供應商（派發時用）
     r = await db.execute(select(Supplier).where(Supplier.is_active == True).order_by(Supplier.type, Supplier.name))

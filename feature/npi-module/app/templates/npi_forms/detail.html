@@ -1413,49 +1413,84 @@
       <div class="card shadow-sm mb-3">
         <div class="card-header bg-white fw-semibold">
           <i class="bi bi-calendar-check me-2"></i>客戶需求 T1 與樣品提供時間
-          <small class="text-muted fw-normal">（每張圖獨立；儲存後系統會通知工程接手）</small>
+          <small class="text-muted fw-normal">（每張圖獨立；修改後離開欄位即自動儲存並通知工程）</small>
         </div>
         <div class="card-body">
           {% if _drawings %}
-          <form method="post" action="/npi-forms/{{ form.form_id }}/save-t1-plan">
-            <table class="table table-sm align-middle">
-              <thead class="table-light">
-                <tr>
-                  <th style="width:40%">圖面</th>
-                  <th style="width:30%">客戶需求 T1 與樣品提供時間</th>
-                  <th>實際開模 T1 時間</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for d in _drawings %}
-                {% set _row = _t1_plan.get(d.id | string) or _t1_plan.get(d.id) or {} %}
-                <tr>
-                  <td>
-                    <input type="hidden" name="drawing_id" value="{{ d.id }}">
-                    <a href="/npi-forms/doc/preview/{{ d.id }}" target="_blank" class="text-decoration-none">
-                      <i class="bi bi-paperclip me-1"></i>{{ d.original_name }}
-                    </a>
-                  </td>
-                  <td>
-                    <input type="text" name="t1_date" class="form-control form-control-sm t1-need-input"
-                           value="{{ _row.t1_date or '' }}" placeholder="例：T1 4/25 / 樣品 6/21"
+          <table class="table table-sm align-middle mb-0" id="t1AutosaveTable">
+            <thead class="table-light">
+              <tr>
+                <th style="width:40%">圖面</th>
+                <th style="width:30%">客戶需求 T1 與樣品提供時間</th>
+                <th>實際開模 T1 時間</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for d in _drawings %}
+              {% set _row = _t1_plan.get(d.id | string) or _t1_plan.get(d.id) or {} %}
+              <tr>
+                <td>
+                  <a href="/npi-forms/doc/preview/{{ d.id }}" target="_blank" class="text-decoration-none">
+                    <i class="bi bi-paperclip me-1"></i>{{ d.original_name }}
+                  </a>
+                </td>
+                <td>
+                  <div class="d-flex align-items-center gap-2">
+                    <input type="text" class="form-control form-control-sm t1-autosave"
+                           data-drawing-id="{{ d.id }}"
+                           data-original="{{ _row.t1_date or '' }}"
+                           value="{{ _row.t1_date or '' }}"
+                           placeholder="例：T1 4/25 / 樣品 6/21"
                            {% if user.role.value not in ('sales','admin') %}disabled{% endif %}>
-                  </td>
-                  <td class="text-muted">
-                    {{ _row.actual_t1_date or '（採購填寫）' }}
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-            {% if user.role.value in ('sales','admin') %}
-            <div class="text-end">
-              <button class="btn btn-primary btn-sm">
-                <i class="bi bi-save me-1"></i>儲存並送工程
-              </button>
-            </div>
-            {% endif %}
-          </form>
+                    <span class="t1-save-status small text-muted" style="min-width:60px"></span>
+                  </div>
+                </td>
+                <td class="text-muted">
+                  {{ _row.actual_t1_date or '（採購填寫）' }}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% if user.role.value in ('sales','admin') %}
+          <script>
+          (function(){
+            const url = '/npi-forms/{{ form.form_id }}/save-t1-plan';
+            document.querySelectorAll('.t1-autosave').forEach(inp => {
+              const status = inp.parentElement.querySelector('.t1-save-status');
+              const setStatus = (txt, cls) => {
+                if (!status) return;
+                status.className = 't1-save-status small ' + (cls || 'text-muted');
+                status.textContent = txt || '';
+              };
+              const save = async () => {
+                const cur = inp.value.trim();
+                const orig = (inp.dataset.original || '').trim();
+                if (cur === orig) return;
+                setStatus('儲存中…', 'text-muted');
+                try {
+                  const fd = new FormData();
+                  fd.append('drawing_id', inp.dataset.drawingId);
+                  fd.append('t1_date', cur);
+                  const resp = await fetch(url, { method:'POST', body: fd, redirect:'manual' });
+                  if (!resp.ok && resp.type !== 'opaqueredirect') {
+                    throw new Error('狀態 ' + resp.status);
+                  }
+                  inp.dataset.original = cur;
+                  setStatus('✓ 已儲存', 'text-success');
+                  setTimeout(() => setStatus(''), 1500);
+                } catch(err) {
+                  setStatus('✗ 失敗', 'text-danger');
+                }
+              };
+              inp.addEventListener('blur', save);
+              inp.addEventListener('keydown', e => {
+                if (e.key === 'Enter') { e.preventDefault(); inp.blur(); }
+              });
+            });
+          })();
+          </script>
+          {% endif %}
           {% else %}
           <div class="text-muted small"><i class="bi bi-info-circle me-1"></i>尚未上傳圖面，無法設定 T1 計畫。</div>
           {% endif %}
@@ -1468,10 +1503,40 @@
     {# ── 右：附件 / 操作 / 簽核紀錄 ── #}
     <div class="col-lg-4">
 
+      {# 該角色在目前狀態是否「應該」看到操作 — 不相關角色直接隱藏整個操作 card #}
+      {% set _r = user.role.value %}
+      {% set _s = form.status.value %}
+      {% set _is_creator = (user.id == form.created_by) %}
+      {% set _role_can_act =
+           _r == 'admin'
+           or (_s == 'DRAFT' and _r == 'sales' and _is_creator)
+           or (_s == 'ENG_DISPATCH' and _r == 'engineer')
+           or (_s == 'QUOTING' and _r in ('engineer','purchase'))
+           or (_s == 'QUOTES_COLLECTED' and _r == 'sales')
+           or (_s == 'PENDING_QUOTE_BU' and _r == 'bu')
+           or (_s == 'QUOTE_APPROVED' and _r == 'sales')
+           or (_s == 'RFQ_DONE' and _r == 'sales')
+           or (_s == 'NPI_STARTED' and _r in ('sales','engineer'))
+           or (_s == 'NPI_PENDING_BU' and _r == 'bu')
+           or (_s == 'NPI_PENDING_PURCHASE' and _r == 'purchase')
+           or (_s == 'RETURNED' and (
+                  (form.reject_to == '業務' and _r == 'sales' and _is_creator)
+               or (form.reject_to == '工程師' and _r == 'engineer')
+               or (form.reject_to == '採購' and _r == 'purchase')
+              ))
+      %}
+
       {# 操作區 #}
       <div class="card shadow-sm mb-3">
         <div class="card-header bg-white fw-semibold"><i class="bi bi-lightning me-2"></i>操作</div>
         <div class="card-body">
+
+          {% if not _role_can_act %}
+          <div class="text-muted small text-center py-2">
+            <i class="bi bi-info-circle me-1"></i>
+            目前狀態 <strong>{{ _s }}</strong> 無需您的操作
+          </div>
+          {% else %}
 
           {# 業務退回補件修改（RETURNED·業務）#}
           {% if form.status.value == 'RETURNED' and form.reject_to == '業務'
@@ -1653,6 +1718,8 @@
           {% else %}
           <div class="text-muted small text-center">目前狀態 — <strong>{{ form.status.value }}</strong></div>
           {% endif %}
+
+          {% endif %}{# end _role_can_act #}
         </div>
       </div>
 

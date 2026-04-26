@@ -33,7 +33,11 @@
   </div>
 
   <nav class="flex-grow-1">
+    {# ── RFQ / NPI 流程相關角色才能看到（業務 / 工程 / 採購 / BU / admin）── #}
+    {% set _rfq_npi_roles = ('sales', 'engineer', 'purchase', 'bu', 'admin') %}
+
     {# ── RFQ 詢價 ── #}
+    {% if user.role.value in _rfq_npi_roles %}
     <div class="text-white-50 px-3 mb-1" style="font-size:0.7rem;letter-spacing:1px">RFQ 詢價</div>
     <a href="/npi-forms/?stage=RFQ" class="nav-link {% if request.query_params.get('stage') == 'RFQ' %}active{% endif %}">
       <i class="bi bi-envelope-paper me-2"></i>RFQ 流程管理
@@ -43,6 +47,7 @@
       <i class="bi bi-plus-circle me-2"></i>新建 RFQ 詢價單
     </a>
     {% endif %}
+    {% endif %}
     {% if user.role.value in ('engineer', 'admin') %}
     <a href="/title-block/" class="nav-link {% if '/title-block' in request.url.path %}active{% endif %}">
       <i class="bi bi-border-outer me-2"></i>圖框轉換
@@ -50,10 +55,12 @@
     {% endif %}
 
     {# ── NPI 開發 ── #}
+    {% if user.role.value in _rfq_npi_roles %}
     <div class="text-white-50 px-3 mb-1 mt-3" style="font-size:0.7rem;letter-spacing:1px">NPI 開發</div>
     <a href="/npi-forms/?stage=NPI" class="nav-link {% if request.query_params.get('stage') == 'NPI' %}active{% endif %}">
       <i class="bi bi-gear-wide-connected me-2"></i>NPI 開發管理
     </a>
+    {% endif %}
 
     {# ── PCN / ECN 變更 ── #}
     <div class="text-white-50 px-3 mb-1 mt-3" style="font-size:0.7rem;letter-spacing:1px">PCN / ECN 變更</div>

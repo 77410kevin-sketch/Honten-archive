@@ -4746,3 +4746,27 @@ remote:   git@github.com:77410kevin-sketch/Honten-archive.git
 To github.com:77410kevin-sketch/Honten.git
    5a002a8..1adf67e  main -> main
 [2026-04-26 14:48] push all branches OK
+[main cabdb44] 自動備份 2026-04-26 15:48
+ Committer: kevin <kevin@kevindeMac-mini.local>
+Your name and email address were configured automatically based
+on your username and hostname. Please check that they are accurate.
+You can suppress this message by setting them explicitly. Run the
+following command and follow the instructions in your editor to edit
+your configuration file:
+
+    git config --global --edit
+
+After doing this, you may fix the identity used for this commit with:
+
+    git commit --amend --reset-author
+
+ 7 files changed, 1350 insertions(+), 55 deletions(-)
+ create mode 100644 feature/npi-module/nas_npi/RFQ-20260426-002/RFQ_Archive/REF-HT_safd254-metal-DX29.pdf.pdf
+ create mode 100644 "feature/npi-module/nas_npi/RFQ-20260426-002/RFQ_Quote/customer_quote/RFQ-20260426-002_\345\256\242\346\210\266\345\240\261\345\203\271\345\226\256.html"
+ create mode 100644 feature/npi-module/nas_npi/RFQ-20260426-002/RFQ_Quote/internal_cost_analysis/quote_summary.json
+[2026-04-26 15:48] commit on main
+remote: This repository moved. Please use the new location:        
+remote:   git@github.com:77410kevin-sketch/Honten-archive.git        
+To github.com:77410kevin-sketch/Honten.git
+   1adf67e..cabdb44  main -> main
+[2026-04-26 15:48] push all branches OK

@@ -20,8 +20,14 @@ from app.models.pcn_form import PCNForm, PCNDocument, PCNApproval
 from app.models.supplier import Supplier, SupplierType
 from app.models.customer import Customer
 from app.models.npi_form import NPIForm, NPIDocument, NPIApproval, NPISupplierInvite
+from app.models.qc_exception import (
+    QCException, QCExceptionDocument, QCExceptionApproval,
+)
 from app.services.auth import hash_password
-from app.routes import auth, pcn_forms, drawing_checker, npi_forms, suppliers, customers, title_block
+from app.routes import (
+    auth, pcn_forms, drawing_checker, npi_forms, suppliers, customers, title_block,
+    qc_exceptions,
+)
 
 
 # ── Seed 初始資料 ────────────────────────────────
@@ -32,6 +38,7 @@ async def seed_users():
         {"username": "admin",      "display_name": "系統管理員",  "role": Role.ADMIN,     "bu": None},
         {"username": "eng01",      "display_name": "王工程師",    "role": Role.ENGINEER,  "bu": BU.ENERGY},
         {"username": "qa01",       "display_name": "李品保",      "role": Role.QC,        "bu": None},
+        {"username": "ipqc",       "display_name": "品保（IQC/IPQC/OQC 共用）", "role": Role.QC, "bu": None},
         {"username": "pd01",       "display_name": "張產線主管",  "role": Role.PROD_MGR,  "bu": None},
         {"username": "bh01",       "display_name": "陳BU主管",    "role": Role.BU,        "bu": BU.ENERGY},
         {"username": "engmgr",     "display_name": "林工程主管",  "role": Role.ENG_MGR,   "bu": None},
@@ -117,6 +124,9 @@ async def run_migrations():
         "UPDATE users SET username='qa01' WHERE username='qc01'",
         "UPDATE users SET username='pd01' WHERE username='prodmgr01'",
         "UPDATE users SET username='bh01' WHERE username='buhead'",
+        # QC 異常表新增欄位
+        "ALTER TABLE qc_exceptions ADD COLUMN doc_type VARCHAR(20)",
+        "ALTER TABLE qc_exceptions ADD COLUMN event_date_type VARCHAR(20)",
     ]
     async with engine.begin() as conn:
         for sql in migrations:
@@ -167,6 +177,7 @@ app.include_router(npi_forms.router)
 app.include_router(suppliers.router)
 app.include_router(customers.router)
 app.include_router(title_block.router)
+app.include_router(qc_exceptions.router)
 
 
 @app.get("/")

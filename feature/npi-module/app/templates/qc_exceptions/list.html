@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}QC 異常管理{% endblock %}
+{% block content %}
+<div class="d-flex align-items-center mb-3">
+  <h4 class="mb-0">
+    <i class="bi bi-exclamation-octagon text-danger me-2"></i>QC 異常管理（NCR）
+  </h4>
+  {% if user.role.value in ('qc','admin') %}
+  <a href="/qc-exceptions/new" class="btn btn-danger ms-auto">
+    <i class="bi bi-plus-circle me-1"></i>新建異常單
+  </a>
+  {% endif %}
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>單號</th>
+            <th>狀態</th>
+            <th>品號</th>
+            <th>批號</th>
+            <th>工段 / 廠商</th>
+            <th class="text-end">不良率</th>
+            <th>處理判斷</th>
+            <th>ECN</th>
+            <th>建立</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for f in forms %}
+          <tr>
+            <td><a href="/qc-exceptions/{{ f.form_id }}" class="text-decoration-none fw-semibold">{{ f.form_id }}</a></td>
+            <td>
+              {% set s = f.status.value %}
+              {% if s == 'DRAFT' %}<span class="badge bg-secondary">草稿</span>
+              {% elif s == 'PENDING_DISPOSITION' %}<span class="badge bg-warning text-dark">待品保判斷</span>
+              {% elif s == 'PENDING_RCA' %}<span class="badge bg-info text-dark">待根因/通知</span>
+              {% elif s == 'PENDING_IMPROVEMENT' %}<span class="badge bg-primary">待改善方案</span>
+              {% elif s == 'LINKED_ECN' %}<span class="badge bg-warning text-dark">已綁 ECN</span>
+              {% elif s == 'CLOSED' %}<span class="badge bg-success">結案</span>
+              {% endif %}
+            </td>
+            <td><strong>{{ f.part_no }}</strong></td>
+            <td class="small text-muted">{{ f.lot_no or '—' }}</td>
+            <td class="small">
+              <span class="badge bg-light text-dark border">{{ f.stage.value }}</span>
+              {{ f.supplier_name or '—' }}
+            </td>
+            <td class="text-end">
+              {% if f.defect_rate is not none %}
+                <span class="fw-semibold {% if f.defect_rate >= 0.05 %}text-danger{% endif %}">
+                  {{ '%.1f' % (f.defect_rate * 100) }}%
+                </span>
+                <small class="text-muted d-block">{{ f.defect_qty }} / {{ f.sample_qty }}</small>
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              {% if f.disposition %}
+                {% set d = f.disposition.value %}
+                {% if d == 'RETURN_TO_SUPPLIER' %}<span class="badge bg-danger">退貨</span>
+                {% elif d == 'LAB_TEST' %}<span class="badge bg-info text-dark">實驗測試</span>
+                {% elif d == 'SPECIAL_ACCEPT' %}<span class="badge bg-success">特採允收</span>
+                {% endif %}
+              {% else %}—{% endif %}
+            </td>
+            <td class="small">
+              {% if f.linked_ecn %}
+              <a href="/pcn-forms/{{ f.linked_ecn.form_id }}" class="text-decoration-none">
+                <i class="bi bi-link-45deg"></i>{{ f.linked_ecn.form_id }}
+              </a>
+              {% else %}—{% endif %}
+            </td>
+            <td class="small text-muted">
+              {{ f.created_at.strftime('%m-%d %H:%M') }}<br>
+              <span class="text-secondary">{{ f.creator.display_name if f.creator else '—' }}</span>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="9" class="text-center text-muted py-4">目前無 QC 異常單</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

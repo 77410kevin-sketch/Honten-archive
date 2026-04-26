@@ -70,6 +70,18 @@
     <a href="/pcn-forms/new" class="nav-link {% if request.url.path == '/pcn-forms/new' %}active{% endif %}">
       <i class="bi bi-plus-circle me-2"></i>{% if user.role.value in ('engineer', 'admin') %}新建 PCN/ECN{% else %}新建 ECN{% endif %}
     </a>
+    {% if user.role.value in ('qc','engineer','eng_mgr','purchase','prod_mgr','assistant','bu','admin') %}
+    <div class="text-white-50 px-3 mb-1 mt-3" style="font-size:0.7rem;letter-spacing:1px">QC 異常</div>
+    <a href="/qc-exceptions/" class="nav-link {% if '/qc-exceptions' in request.url.path and request.url.path != '/qc-exceptions/new' %}active{% endif %}">
+      <i class="bi bi-exclamation-octagon me-2"></i>QC 異常管理 (NCR)
+    </a>
+    {% if user.role.value in ('qc','prod_mgr','assistant','admin') %}
+    <a href="/qc-exceptions/new" class="nav-link {% if request.url.path == '/qc-exceptions/new' %}active{% endif %}">
+      <i class="bi bi-plus-circle me-2"></i>新建異常單
+    </a>
+    {% endif %}
+    {% endif %}
+
     {% if user.role.value in ('qc', 'admin') %}
     <a href="/drawing-checker/" class="nav-link {% if '/drawing-checker' in request.url.path %}active{% endif %}">
       <i class="bi bi-rulers me-2"></i>圖面辨識量測表

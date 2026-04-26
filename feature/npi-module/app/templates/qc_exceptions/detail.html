@@ -1,0 +1,373 @@
+{% extends "base.html" %}
+{% block title %}{{ form.form_id }} — QC 異常單{% endblock %}
+{% block content %}
+
+{% set _is_qc = user.role.value in ('qc','admin') %}
+{% set _s = form.status.value %}
+
+<div class="d-flex align-items-center mb-3">
+  <h4 class="mb-0">
+    <i class="bi bi-exclamation-octagon text-danger me-2"></i>{{ form.form_id }}
+    {% if _s == 'DRAFT' %}<span class="badge bg-secondary ms-2">草稿</span>
+    {% elif _s == 'PENDING_DISPOSITION' %}<span class="badge bg-warning text-dark ms-2">待品保判斷</span>
+    {% elif _s == 'PENDING_RCA' %}<span class="badge bg-info text-dark ms-2">待根因/通知</span>
+    {% elif _s == 'PENDING_IMPROVEMENT' %}<span class="badge bg-primary ms-2">待改善方案</span>
+    {% elif _s == 'LINKED_ECN' %}<span class="badge bg-warning text-dark ms-2">已綁 ECN</span>
+    {% elif _s == 'CLOSED' %}<span class="badge bg-success ms-2">結案</span>
+    {% endif %}
+  </h4>
+  <a href="/qc-exceptions/" class="btn btn-sm btn-outline-secondary ms-auto">
+    <i class="bi bi-list me-1"></i>回列表
+  </a>
+</div>
+
+{# 進度軸 #}
+{% set _steps = [
+  ('DRAFT', '品保草稿', 'bi-pencil'),
+  ('PENDING_DISPOSITION', '待品保判斷', 'bi-search'),
+  ('PENDING_RCA', '根因+通知', 'bi-envelope-paper'),
+  ('PENDING_IMPROVEMENT', '改善方案', 'bi-tools'),
+  ('LINKED_ECN', '綁 ECN', 'bi-link-45deg'),
+  ('CLOSED', '結案', 'bi-check2-circle'),
+] %}
+{% set _idx_map = {'DRAFT':0, 'PENDING_DISPOSITION':1, 'PENDING_RCA':2,
+                   'PENDING_IMPROVEMENT':3, 'LINKED_ECN':4, 'CLOSED':5} %}
+{% set _cur = _idx_map[_s] %}
+<div class="card shadow-sm mb-3">
+  <div class="card-body py-3">
+    <div class="d-flex justify-content-between align-items-center text-center">
+      {% for code, label, icon in _steps %}
+      {% set i = loop.index0 %}
+      <div class="flex-fill">
+        <div class="rounded-circle d-inline-flex align-items-center justify-content-center
+                    {% if i < _cur %}bg-success text-white
+                    {% elif i == _cur %}bg-warning text-dark
+                    {% else %}bg-light text-muted{% endif %}"
+             style="width:38px;height:38px">
+          <i class="bi {{ icon }}"></i>
+        </div>
+        <div class="small mt-1 {% if i == _cur %}fw-semibold{% endif %}">{{ label }}</div>
+      </div>
+      {% if not loop.last %}
+      <div class="flex-grow-0 px-2"><i class="bi bi-chevron-right text-muted"></i></div>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    {# IPC 異常資訊 #}
+    <div class="card shadow-sm mb-3">
+      <div class="card-header bg-white fw-semibold">
+        <i class="bi bi-clipboard-data me-2"></i>IPC 異常資訊
+      </div>
+      {% set _doc_lbl = {'RECEIVE':'進貨單號','PROCESS':'製程單號','SHIP_DC':'出貨 D/C'} %}
+      {% set _date_lbl = {'RECEIVE':'進貨日期','PRODUCE':'生產日期','SHIP':'出貨日期','COMPLAINT':'客訴日期'} %}
+      {% set _stage_lbl = {'IQC':'IQC','IPQC':'IPQC','OQC':'OQC','INSPECTION':'品檢',
+                           'LASER':'雷雕','CNC':'CNC','ASSEMBLY':'組裝','OTHER':'其他'} %}
+      <div class="card-body">
+        <div class="row g-3 small">
+          <div class="col-md-4"><strong>品號：</strong>{{ form.part_no }}</div>
+          <div class="col-md-4">
+            <strong>{{ _doc_lbl.get(form.doc_type.value, '單號') if form.doc_type else '單號' }}：</strong>
+            {{ form.receive_doc_no or '—' }}
+          </div>
+          <div class="col-md-4">
+            <strong>{{ _date_lbl.get(form.event_date_type.value, '日期') if form.event_date_type else '日期' }}：</strong>
+            {{ form.receive_date or '—' }}
+          </div>
+          <div class="col-md-4"><strong>工段+廠商：</strong>
+            <span class="badge bg-light text-dark border">{{ _stage_lbl.get(form.stage.value, form.stage.value) }}</span>
+            +{{ form.supplier_name or '—' }}
+          </div>
+          <div class="col-md-4"><strong>數量：</strong>{{ form.receive_qty or '—' }} pcs</div>
+          <div class="col-12"><strong>異常原因：</strong>
+            <span class="text-danger fw-semibold">{{ form.defect_cause }}</span>
+          </div>
+          <div class="col-md-6"><strong>量測數據：</strong>{{ form.measurement_data or '—' }}</div>
+          <div class="col-md-6"><strong>不良率：</strong>
+            {% if form.defect_rate is not none %}
+              {{ form.defect_qty }} / {{ form.sample_qty }}
+              <span class="fw-semibold {% if form.defect_rate >= 0.05 %}text-danger{% else %}text-success{% endif %}">
+                {{ '%.1f' % (form.defect_rate * 100) }}%
+              </span>
+            {% else %}—{% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# 品保處理判斷 #}
+    {% if _is_qc and _s in ('PENDING_DISPOSITION', 'DRAFT') %}
+    <div class="card shadow-sm mb-3 border-warning">
+      <div class="card-header bg-warning-subtle fw-semibold">
+        <i class="bi bi-search me-2"></i>品保處理判斷
+      </div>
+      <div class="card-body">
+        <form method="post" action="/qc-exceptions/{{ form.form_id }}/disposition">
+          <div class="row g-2 mb-2">
+            <div class="col-md-4">
+              <select name="disposition" class="form-select" required>
+                <option value="">— 選擇處理方式 —</option>
+                <option value="RETURN_TO_SUPPLIER">退貨</option>
+                <option value="LAB_TEST">實驗測試</option>
+                <option value="SPECIAL_ACCEPT">特採允收</option>
+              </select>
+            </div>
+            <div class="col-md-8">
+              <input name="note" class="form-control" placeholder="處理判斷說明（選填）">
+            </div>
+          </div>
+          <button class="btn btn-warning">
+            <i class="bi bi-check2-square me-1"></i>下處理判斷 → 根因階段
+          </button>
+        </form>
+      </div>
+    </div>
+    {% elif form.disposition %}
+    <div class="card shadow-sm mb-3">
+      <div class="card-header bg-white fw-semibold">處理判斷紀錄</div>
+      <div class="card-body small">
+        <strong>處理方式：</strong>
+        {% if form.disposition.value == 'RETURN_TO_SUPPLIER' %}<span class="badge bg-danger">退貨</span>
+        {% elif form.disposition.value == 'LAB_TEST' %}<span class="badge bg-info text-dark">實驗測試</span>
+        {% elif form.disposition.value == 'SPECIAL_ACCEPT' %}<span class="badge bg-success">特採允收</span>
+        {% endif %}
+        <span class="text-muted ms-2">由 {{ form.dispositioner.display_name if form.dispositioner else '—' }}
+          於 {{ form.disposition_at.strftime('%Y-%m-%d %H:%M') if form.disposition_at else '' }} 判定</span>
+        {% if form.disposition_note %}
+        <div class="mt-1"><strong>備註：</strong>{{ form.disposition_note }}</div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {# Mail 通知 + 根因分析 #}
+    {% if _s in ('PENDING_RCA', 'PENDING_IMPROVEMENT', 'LINKED_ECN', 'CLOSED') %}
+    <div class="card shadow-sm mb-3 {% if _s == 'PENDING_RCA' %}border-info{% endif %}">
+      <div class="card-header {% if _s == 'PENDING_RCA' %}bg-info-subtle{% else %}bg-white{% endif %} fw-semibold">
+        <i class="bi bi-envelope-paper me-2"></i>Mail 通知 + 根因分析
+      </div>
+      <div class="card-body">
+        {% if _is_qc and _s in ('PENDING_RCA','PENDING_IMPROVEMENT') %}
+        <form method="post" action="/qc-exceptions/{{ form.form_id }}/save-rca">
+          <div class="row g-2 mb-2">
+            <div class="col-md-6">
+              <label class="form-label small">收件人 (To，多人用 , 隔開)</label>
+              <input name="notify_mail_to" class="form-control form-control-sm"
+                     value="{{ form.notify_mail_to or '' }}"
+                     placeholder="qa@honten.com, eng@honten.com">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small">副本 (Cc)</label>
+              <input name="notify_mail_cc" class="form-control form-control-sm"
+                     value="{{ form.notify_mail_cc or '' }}"
+                     placeholder="bu@honten.com">
+            </div>
+          </div>
+          <label class="form-label small">根因分析（5Why / 魚骨圖摘要）</label>
+          <textarea name="root_cause" rows="4" class="form-control"
+                    placeholder="根因：例如 廠商換刀後未重新對 0…">{{ form.root_cause or '' }}</textarea>
+          <div class="d-flex gap-2 mt-2">
+            <button name="advance" value="0" class="btn btn-outline-secondary btn-sm">
+              <i class="bi bi-save me-1"></i>儲存
+            </button>
+            {% if _s == 'PENDING_RCA' %}
+            <button name="advance" value="1" class="btn btn-info text-white btn-sm">
+              <i class="bi bi-send me-1"></i>已 Mail 通知 + 根因完成 → 改善方案
+            </button>
+            {% endif %}
+          </div>
+        </form>
+        {% else %}
+        <div class="small">
+          <div><strong>收件人：</strong>{{ form.notify_mail_to or '—' }}</div>
+          <div><strong>副本：</strong>{{ form.notify_mail_cc or '—' }}</div>
+          <div class="mt-2"><strong>根因分析：</strong></div>
+          <div class="border rounded p-2 bg-light">{{ form.root_cause or '（尚未填寫）' }}</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {# 長期改善方案 + ECN 綁定 #}
+    {% if _s in ('PENDING_IMPROVEMENT', 'LINKED_ECN', 'CLOSED') %}
+    <div class="card shadow-sm mb-3 {% if _s == 'PENDING_IMPROVEMENT' %}border-primary{% endif %}">
+      <div class="card-header {% if _s == 'PENDING_IMPROVEMENT' %}bg-primary-subtle{% else %}bg-white{% endif %} fw-semibold">
+        <i class="bi bi-tools me-2"></i>長期改善方案
+      </div>
+      <div class="card-body">
+        {% if _is_qc and _s in ('PENDING_IMPROVEMENT','LINKED_ECN') %}
+        <form method="post" action="/qc-exceptions/{{ form.form_id }}/save-improvement">
+          <div class="d-flex flex-wrap gap-3 mb-2">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="need_drawing_rev" value="1"
+                     id="needDraw" {% if form.need_drawing_rev %}checked{% endif %}>
+              <label for="needDraw" class="form-check-label">需修訂圖面</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="need_sop_rev" value="1"
+                     id="needSop" {% if form.need_sop_rev %}checked{% endif %}>
+              <label for="needSop" class="form-check-label">需修訂 SOP</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="need_sip_rev" value="1"
+                     id="needSip" {% if form.need_sip_rev %}checked{% endif %}>
+              <label for="needSip" class="form-check-label">需修訂 SIP</label>
+            </div>
+          </div>
+          <textarea name="improvement_plan" rows="3" class="form-control"
+                    placeholder="改善方案內容…">{{ form.improvement_plan or '' }}</textarea>
+          <div class="d-flex gap-2 mt-2">
+            <button name="advance" value="" class="btn btn-outline-secondary btn-sm">
+              <i class="bi bi-save me-1"></i>儲存
+            </button>
+            {% if _s == 'PENDING_IMPROVEMENT' %}
+            <button name="advance" value="ecn" class="btn btn-warning btn-sm">
+              <i class="bi bi-link-45deg me-1"></i>需開 ECN（進等待 ECN 階段）
+            </button>
+            <button name="advance" value="close"
+                    class="btn btn-success btn-sm"
+                    onclick="return confirm('確定無需 ECN，直接結案？');">
+              <i class="bi bi-check2-circle me-1"></i>無需 ECN，直接結案
+            </button>
+            {% endif %}
+          </div>
+        </form>
+
+        {# ECN 綁定 #}
+        {% if _s in ('PENDING_IMPROVEMENT','LINKED_ECN') %}
+        <hr>
+        <form method="post" action="/qc-exceptions/{{ form.form_id }}/link-ecn"
+              class="d-flex gap-2 align-items-end">
+          <div class="flex-grow-1">
+            <label class="form-label small">綁定已建立的 ECN 單號</label>
+            <input name="ecn_form_id" class="form-control form-control-sm"
+                   placeholder="例：PCN-20260424-001"
+                   value="{{ form.linked_ecn.form_id if form.linked_ecn else '' }}">
+          </div>
+          <button class="btn btn-warning btn-sm">
+            <i class="bi bi-link-45deg me-1"></i>綁定 ECN
+          </button>
+        </form>
+        {% endif %}
+        {% else %}
+        <div class="small">
+          <div class="mb-2">
+            {% if form.need_drawing_rev %}<span class="badge bg-info text-dark me-1">需修訂圖面</span>{% endif %}
+            {% if form.need_sop_rev %}<span class="badge bg-info text-dark me-1">需修訂 SOP</span>{% endif %}
+            {% if form.need_sip_rev %}<span class="badge bg-info text-dark me-1">需修訂 SIP</span>{% endif %}
+          </div>
+          <div class="border rounded p-2 bg-light">{{ form.improvement_plan or '（尚未填寫）' }}</div>
+          {% if form.linked_ecn %}
+          <div class="mt-2">
+            <strong>已綁 ECN：</strong>
+            <a href="/pcn-forms/{{ form.linked_ecn.form_id }}" target="_blank">
+              <i class="bi bi-link-45deg"></i>{{ form.linked_ecn.form_id }}
+            </a>
+          </div>
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {# 簽核紀錄 #}
+    <div class="card shadow-sm mb-3">
+      <div class="card-header bg-white fw-semibold"><i class="bi bi-clipboard-data me-2"></i>簽核紀錄</div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm mb-0 align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>時間</th><th>動作</th><th>操作人</th><th>狀態變更</th><th>備註</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for a in form.approvals %}
+              <tr>
+                <td class="small">{{ a.created_at.strftime('%m-%d %H:%M') }}</td>
+                <td><span class="badge bg-secondary">{{ a.action }}</span></td>
+                <td class="small">{{ a.approver.display_name if a.approver else '—' }}</td>
+                <td class="small">
+                  {% set k = (a.from_status or '') ~ '→' ~ (a.to_status or '') %}
+                  {% if k in transition_combo %}
+                    {% set lbl, cls = transition_combo[k] %}
+                    <span class="badge bg-{{ cls }}">{{ lbl }}</span>
+                  {% else %}
+                    <span class="text-muted small">{{ a.from_status }} → {{ a.to_status }}</span>
+                  {% endif %}
+                </td>
+                <td class="small text-muted">{{ a.comment or '—' }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    {# 操作 #}
+    <div class="card shadow-sm mb-3">
+      <div class="card-header bg-white fw-semibold"><i class="bi bi-lightning me-2"></i>操作</div>
+      <div class="card-body">
+        {% if _is_qc and _s == 'DRAFT' %}
+        <form method="post" action="/qc-exceptions/{{ form.form_id }}/disposition" class="mb-2">
+          <input type="hidden" name="disposition" value="LAB_TEST">
+          <button class="btn btn-outline-secondary w-100 btn-sm" disabled>
+            草稿請於上方填寫處理判斷送出
+          </button>
+        </form>
+        {% endif %}
+
+        {% if _is_qc and _s in ('LINKED_ECN',) %}
+        <form method="post" action="/qc-exceptions/{{ form.form_id }}/close" class="mb-2"
+              onsubmit="return confirm('確認 ECN 已完成，QC 異常單結案？');">
+          <input type="hidden" name="comment" value="ECN 完成 → QC 結案">
+          <button class="btn btn-success w-100">
+            <i class="bi bi-check2-circle me-1"></i>ECN 完成 → 結案
+          </button>
+        </form>
+        {% endif %}
+
+        {% if _s == 'CLOSED' %}
+        <div class="text-success small text-center">
+          <i class="bi bi-check2-circle me-1"></i>本單已結案
+        </div>
+        {% else %}
+        <div class="text-muted small text-center">目前狀態 — <strong>{{ _s }}</strong></div>
+        {% endif %}
+      </div>
+    </div>
+
+    {# 附件 #}
+    <div class="card shadow-sm">
+      <div class="card-header bg-white fw-semibold"><i class="bi bi-paperclip me-2"></i>附件</div>
+      <div class="card-body">
+        {% for cat in ATTACH_CATEGORIES %}
+        {% if cat in docs_by_cat %}
+        <div class="mb-2">
+          <div class="small fw-semibold text-primary mb-1">{{ cat }}</div>
+          {% for d in docs_by_cat[cat] %}
+          <div class="small border-bottom py-1">
+            <i class="bi bi-paperclip me-1"></i>{{ d.original_name }}
+            <span class="text-muted ms-1">{{ d.uploaded_at.strftime('%m-%d %H:%M') }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% endfor %}
+        {% if not docs_by_cat %}
+        <div class="text-muted small">尚未上傳附件</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

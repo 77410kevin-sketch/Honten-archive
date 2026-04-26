@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+{% block title %}新建 QC 異常單{% endblock %}
+{% block content %}
+{% set _stage_labels = {
+  'IQC':'IQC（進料檢驗）','IPQC':'IPQC（製程檢驗）','OQC':'OQC（出貨檢驗）',
+  'INSPECTION':'品檢','LASER':'雷雕','CNC':'CNC','ASSEMBLY':'組裝','OTHER':'其他'
+} %}
+{% set _doc_labels = {
+  'RECEIVE':'進貨單號','PROCESS':'製程單號','SHIP_DC':'出貨 D/C'
+} %}
+{% set _doc_placeholders = {
+  'RECEIVE':'例：3402-260424001','PROCESS':'例：MO-260424001','SHIP_DC':'例：DC-260424'
+} %}
+{% set _date_labels = {
+  'RECEIVE':'進貨日期','PRODUCE':'生產日期','SHIP':'出貨日期','COMPLAINT':'客訴日期'
+} %}
+
+<div class="container py-4" style="max-width:960px">
+  <h4 class="mb-3">
+    <i class="bi bi-exclamation-octagon text-danger me-2"></i>新建 QC 異常單（IPC 異常資訊）
+  </h4>
+
+  <form method="post" action="/qc-exceptions/new" enctype="multipart/form-data" id="qcForm">
+    <div class="card shadow-sm mb-3">
+      <div class="card-header bg-white fw-semibold">IPC 異常資訊（固定公版）</div>
+      <div class="card-body row g-3">
+        <div class="col-md-4">
+          <label class="form-label">品號 <span class="text-danger">*</span></label>
+          <input name="part_no" class="form-control" placeholder="例：KS04P" required>
+        </div>
+
+        {# 單號（類型 + 號碼） #}
+        <div class="col-md-8">
+          <label class="form-label">單號</label>
+          <div class="input-group">
+            <select name="doc_type" id="docTypeSel" class="form-select" style="max-width:140px">
+              {% for v, lbl in _doc_labels.items() %}
+              <option value="{{ v }}"{% if v == 'RECEIVE' %} selected{% endif %}>{{ lbl }}</option>
+              {% endfor %}
+            </select>
+            <input name="receive_doc_no" id="docNoInp" class="form-control"
+                   placeholder="例：3402-260424001">
+          </div>
+        </div>
+
+        {# 日期（類型 + 值） #}
+        <div class="col-md-4">
+          <label class="form-label">日期</label>
+          <div class="input-group">
+            <select name="event_date_type" class="form-select" style="max-width:120px">
+              {% for v, lbl in _date_labels.items() %}
+              <option value="{{ v }}"{% if v == 'RECEIVE' %} selected{% endif %}>{{ lbl }}</option>
+              {% endfor %}
+            </select>
+            <input name="receive_date" class="form-control" placeholder="例：4/24">
+          </div>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">工段</label>
+          <select name="stage" class="form-select">
+            {% for st in QCExceptionStage %}
+            <option value="{{ st.value }}"{% if st.value == 'IQC' %} selected{% endif %}>
+              {{ _stage_labels.get(st.value, st.value) }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">廠商</label>
+          <input name="supplier_name" class="form-control" placeholder="例：展倚">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">數量</label>
+          <input name="receive_qty" type="number" min="0" class="form-control" placeholder="36472">
+        </div>
+
+        <div class="col-12">
+          <label class="form-label">異常原因 <span class="text-danger">*</span></label>
+          <input name="defect_cause" class="form-control"
+                 placeholder="例：總長過長 32.00+-0.1" required>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">量測數據</label>
+          <input name="measurement_data" class="form-control" placeholder="例：32.11~32.15">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">不良數量</label>
+          <input name="defect_qty" type="number" min="0" class="form-control" placeholder="40">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">抽樣數量</label>
+          <input name="sample_qty" type="number" min="0" class="form-control" placeholder="315">
+        </div>
+        <div class="col-12 small text-muted">
+          <i class="bi bi-info-circle me-1"></i>
+          系統會自動以「不良數 / 抽樣數」計算不良率（例：40 / 315 = 12.6%）。
+        </div>
+      </div>
+    </div>
+
+    {# 附件區：支援截圖貼上 + 傳統檔案 #}
+    <div class="card shadow-sm mb-3">
+      <div class="card-header bg-white fw-semibold">
+        附件 <small class="text-muted fw-normal">（截圖直接貼上 / 也可選檔案；異常照片 / 量測報告 / 圖面 等）</small>
+      </div>
+      <div class="card-body">
+        {# 截圖貼上區 #}
+        <div id="paste-zone" tabindex="0"
+             class="border border-2 border-dashed rounded p-4 text-center bg-light mb-3"
+             style="cursor:text">
+          <i class="bi bi-clipboard-plus me-1 text-primary"></i>
+          <strong>點此處後按 <kbd>⌘ + V</kbd> / <kbd>Ctrl + V</kbd> 貼上截圖</strong>
+          <div class="small text-muted mt-1">
+            截圖會自動加為附件（類別：異常照片）；也可在下方「+ 增加一筆」上傳檔案
+          </div>
+        </div>
+        <div id="paste-previews" class="row g-2 mb-3"></div>
+
+        {# 傳統檔案上傳 #}
+        <div id="attach-rows">
+          <div class="row g-2 mb-2 attach-row align-items-center">
+            <div class="col-md-3">
+              <select name="attach_categories" class="form-select form-select-sm">
+                {% for c in ATTACH_CATEGORIES %}
+                <option{% if c == '異常照片' %} selected{% endif %}>{{ c }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-8">
+              <input type="file" name="attach_files" class="form-control form-control-sm">
+            </div>
+            <div class="col-md-1">
+              <button type="button" class="btn btn-sm btn-outline-danger remove-row">
+                <i class="bi bi-x"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+        <button type="button" id="add-attach" class="btn btn-sm btn-outline-primary">
+          <i class="bi bi-plus"></i>增加一筆
+        </button>
+      </div>
+    </div>
+
+    <div class="d-flex justify-content-end gap-2">
+      <a href="/qc-exceptions/" class="btn btn-outline-secondary">取消</a>
+      <button name="submit_action" value="draft" class="btn btn-secondary">
+        <i class="bi bi-save me-1"></i>儲存草稿
+      </button>
+      <button name="submit_action" value="submit" class="btn btn-danger">
+        <i class="bi bi-send me-1"></i>送出（直接進待品保判斷）
+      </button>
+    </div>
+  </form>
+</div>
+
+<script>
+// 1) 傳統附件 row 增刪
+document.getElementById("add-attach").addEventListener("click", () => {
+  const first = document.querySelector(".attach-row");
+  const clone = first.cloneNode(true);
+  const fInput = clone.querySelector('input[type=file]');
+  if (fInput) fInput.value = "";
+  document.getElementById("attach-rows").appendChild(clone);
+});
+document.addEventListener("click", (e) => {
+  if (e.target.closest(".remove-row")) {
+    const rows = document.querySelectorAll(".attach-row");
+    if (rows.length > 1) e.target.closest(".attach-row").remove();
+  }
+});
+
+// 2) 單號 placeholder 隨類型切換
+const docPlaceholders = {{ _doc_placeholders | tojson }};
+const docTypeSel = document.getElementById('docTypeSel');
+const docNoInp = document.getElementById('docNoInp');
+docTypeSel.addEventListener('change', () => {
+  docNoInp.placeholder = docPlaceholders[docTypeSel.value] || '';
+});
+
+// 3) 截圖貼上 — focus 在 paste-zone 時，Cmd/Ctrl+V 自動加為附件
+const zone = document.getElementById('paste-zone');
+const previews = document.getElementById('paste-previews');
+
+function addScreenshotFile(file) {
+  // 建一組 hidden field（檔案 + 類別）塞進 form，與 attach_files / attach_categories 對齊
+  const wrap = document.createElement('div');
+  wrap.className = 'col-md-3 col-sm-4 col-6 position-relative';
+  const url = URL.createObjectURL(file);
+  wrap.innerHTML = `
+    <div class="border rounded overflow-hidden bg-white">
+      <img src="${url}" class="w-100" style="height:120px;object-fit:cover">
+      <div class="small text-truncate p-1" title="${file.name}">${file.name}</div>
+    </div>
+    <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1 remove-paste"
+            style="line-height:1;padding:1px 6px">×</button>
+  `;
+  // hidden file input — 用 DataTransfer 把 File 塞進去
+  const fInp = document.createElement('input');
+  fInp.type = 'file';
+  fInp.name = 'attach_files';
+  fInp.classList.add('d-none', 'pasted-file');
+  const dt = new DataTransfer();
+  dt.items.add(file);
+  fInp.files = dt.files;
+  // 對應的 category（截圖一律歸「異常照片」）
+  const cInp = document.createElement('input');
+  cInp.type = 'hidden';
+  cInp.name = 'attach_categories';
+  cInp.value = '異常照片';
+  wrap.appendChild(fInp);
+  wrap.appendChild(cInp);
+  previews.appendChild(wrap);
+  wrap.querySelector('.remove-paste').addEventListener('click', () => wrap.remove());
+}
+
+zone.addEventListener('paste', (e) => {
+  const items = (e.clipboardData && e.clipboardData.items) || [];
+  let found = false;
+  for (const it of items) {
+    if (it.kind === 'file' && it.type.startsWith('image/')) {
+      const blob = it.getAsFile();
+      if (!blob) continue;
+      const ext = (blob.type.split('/')[1] || 'png').replace('jpeg','jpg');
+      const name = `screenshot-${Date.now()}.${ext}`;
+      addScreenshotFile(new File([blob], name, {type: blob.type}));
+      found = true;
+    }
+  }
+  if (found) {
+    e.preventDefault();
+    zone.classList.add('border-success');
+    setTimeout(() => zone.classList.remove('border-success'), 600);
+  }
+});
+
+// 點 paste-zone 時自動 focus（讓貼上事件能觸發）
+zone.addEventListener('click', () => zone.focus());
+</script>
+{% endblock %}

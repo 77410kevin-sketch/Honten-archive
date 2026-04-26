@@ -1,0 +1,148 @@
+{
+  "form_id": "RFQ-20260426-002",
+  "customer_name": "Dynapack International Technology Corp.",
+  "product_name": "UPS 銅金件",
+  "product_model": "DG110U",
+  "quoted_unit_price": 661.25,
+  "cost_analysis_note": null,
+  "bu_quote_note": "核准報價",
+  "quote_cost_data": {
+    "columns": [
+      {
+        "label": "HT_safd254-metal-DX29.pdf",
+        "moq": 15000,
+        "subtotal": 500,
+        "defect_amount": 25,
+        "overhead_amount": 35,
+        "qa_ship_amount": 15,
+        "tooling_cost": 50,
+        "tooling_profit_rate": 0.15,
+        "tooling_profit_amount": 7.5,
+        "tooling_quote": 57.5,
+        "cost_total": 575,
+        "profit_rate": 0.15,
+        "profit_amount": 86.25,
+        "quote": 661.25
+      },
+      {
+        "label": "IMG_3366.PNG",
+        "moq": 15000,
+        "subtotal": 5000,
+        "defect_amount": 250,
+        "overhead_amount": 350,
+        "qa_ship_amount": 150,
+        "tooling_cost": 500,
+        "tooling_profit_rate": 0.15,
+        "tooling_profit_amount": 75,
+        "tooling_quote": 575,
+        "cost_total": 5750,
+        "profit_rate": 0.15,
+        "profit_amount": 862.5,
+        "quote": 6612.5
+      },
+      {
+        "label": "IMG_3382.JPG",
+        "moq": 1500,
+        "subtotal": 4500,
+        "defect_amount": 225,
+        "overhead_amount": 315,
+        "qa_ship_amount": 135,
+        "tooling_cost": 15000,
+        "tooling_profit_rate": 0.15,
+        "tooling_profit_amount": 2250,
+        "tooling_quote": 17250,
+        "cost_total": 5175,
+        "profit_rate": 0.15,
+        "profit_amount": 776.25,
+        "quote": 5951.25
+      },
+      {
+        "label": "IMG_3367.PNG",
+        "moq": 15000,
+        "subtotal": 2800,
+        "defect_amount": 140,
+        "overhead_amount": 196,
+        "qa_ship_amount": 84,
+        "tooling_cost": 150000,
+        "tooling_profit_rate": 0.15,
+        "tooling_profit_amount": 22500,
+        "tooling_quote": 172500,
+        "cost_total": 3220,
+        "profit_rate": 0.15,
+        "profit_amount": 483,
+        "quote": 3703
+      },
+      {
+        "label": "(20160809)2031HQ01287ZA.stp",
+        "moq": null,
+        "subtotal": 1300,
+        "defect_amount": 65,
+        "overhead_amount": 91,
+        "qa_ship_amount": 39,
+        "tooling_cost": 0,
+        "tooling_profit_rate": 0.15,
+        "tooling_profit_amount": 0,
+        "tooling_quote": 0,
+        "cost_total": 1495,
+        "profit_rate": 0.15,
+        "profit_amount": 224.25,
+        "quote": 1719.25
+      },
+      {
+        "label": "Claude.dmg",
+        "moq": 1000,
+        "subtotal": 100,
+        "defect_amount": 5,
+        "overhead_amount": 7,
+        "qa_ship_amount": 3,
+        "tooling_cost": 1000,
+        "tooling_profit_rate": 0.15,
+        "tooling_profit_amount": 150,
+        "tooling_quote": 1150,
+        "cost_total": 115,
+        "profit_rate": 0.15,
+        "profit_amount": 17.25,
+        "quote": 132.25
+      }
+    ],
+    "rows": [
+      {
+        "process": "髮線",
+        "prices": [
+          500,
+          5000,
+          3000,
+          null,
+          null,
+          null
+        ]
+      },
+      {
+        "process": "鋁擠",
+        "prices": [
+          null,
+          null,
+          1500,
+          1500,
+          null,
+          null
+        ]
+      },
+      {
+        "process": "陽極",
+        "prices": [
+          null,
+          null,
+          null,
+          1300,
+          1300,
+          100
+        ]
+      }
+    ],
+    "defect_rate": 0.05,
+    "overhead_rate": 0.07,
+    "qa_ship_rate": 0.03
+  },
+  "approved_at": "2026-04-26T07:25:46.943387"
+}

@@ -144,6 +144,32 @@ document.addEventListener("click", (e) => {
   }
 });
 
+// Enter → 不送出，跳到下一個輸入欄（避免業務在編輯時誤按 Enter 直接送出）
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  const t = e.target;
+  // 只攔表單內 input；textarea 換行、button/select 維持原行為
+  if (t.tagName !== 'INPUT') return;
+  // 檔案/Checkbox/Radio/Submit 等照原行為
+  const skipTypes = ['file', 'checkbox', 'radio', 'submit', 'button', 'reset'];
+  if (skipTypes.indexOf((t.type || '').toLowerCase()) >= 0) return;
+  e.preventDefault();
+  // 找出表單內所有可 focus 的 input/textarea/select，跳到下一個
+  const form = t.form;
+  if (!form) return;
+  const focusables = Array.from(form.querySelectorAll('input, textarea, select'))
+    .filter(el => !el.disabled && el.offsetParent !== null
+                  && skipTypes.indexOf((el.type || '').toLowerCase()) < 0);
+  const idx = focusables.indexOf(t);
+  if (idx >= 0 && idx + 1 < focusables.length) {
+    const next = focusables[idx + 1];
+    next.focus();
+    if (next.select) next.select();
+  } else {
+    t.blur();
+  }
+});
+
 // 刪除已上傳附件（用 fetch 呼叫，避免 nested form 破壞外層 edit form）
 document.addEventListener("click", async (e) => {
   const btn = e.target.closest(".del-doc-btn");

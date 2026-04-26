@@ -338,6 +338,14 @@
         </div>
         <div class="card-body p-0">
           {% if form.invites %}
+          {% if form.status.value in ('QUOTING','QUOTES_COLLECTED','ENG_DISPATCH') and user.role.value in ('engineer','admin') %}
+          <div class="alert alert-info small mb-0 py-2 px-3 rounded-0 border-0">
+            <i class="bi bi-info-circle me-1"></i>
+            每張派發列最右側「操作」欄可單獨
+            <span class="badge bg-info text-white">✉↑ 重發詢價信</span> 或
+            <span class="badge bg-danger">🗑 刪除派發列</span>（橫向捲動表格可看到）
+          </div>
+          {% endif %}
           {# 可否 inline 回填報價（QUOTING 或 BU 退回採購議價）#}
           {% set _can_reply = (form.status.value == 'QUOTING'
                  or (form.status.value == 'RETURNED' and form.reject_to == '採購'))
@@ -393,6 +401,12 @@
                        class="price-hidden"
                        value="{{ inv.quote_amount if inv.quote_amount is not none else '' }}">
                 <small class="text-muted convert-hint d-block" style="font-size:10px;line-height:1"></small>
+                <button type="button" class="btn btn-link btn-sm p-0 mt-1 tier-edit-btn"
+                        data-inv-id="{{ inv.id }}"
+                        data-tier-data='{{ inv.tier_data or "" }}'
+                        style="font-size:11px;text-decoration:none">
+                  <i class="bi bi-bar-chart-steps me-1"></i>{% if inv.tier_data %}編輯階梯（{{ inv.tier_data | fromjson | length }}）{% else %}+ 階梯式 MOQ{% endif %}
+                </button>
               </td>
               <td class="price-cell" data-inv="{{ inv.id }}">
                 <div class="input-group input-group-sm">
@@ -433,7 +447,22 @@
                 <div class="text-muted small inline-file-name" data-inv="{{ inv.id }}">（可多選）</div>
               </td>
               {% else %}
-              <td class="{% if inv.quote_amount %}fw-bold text-success{% endif %}">{{ inv.quote_amount or '—' }}</td>
+              <td class="{% if inv.quote_amount %}fw-bold text-success{% endif %}">
+                {{ inv.quote_amount or '—' }}
+                {% if inv.tier_data %}
+                  {% set _tiers = inv.tier_data | fromjson %}
+                  {% if _tiers %}
+                  <div class="mt-1" style="font-size:11px;line-height:1.3">
+                    <span class="badge bg-info text-dark"><i class="bi bi-bar-chart-steps"></i> 階梯</span>
+                    <ul class="list-unstyled mb-0 mt-1 ps-1">
+                    {% for t in _tiers %}
+                      <li class="text-muted">≥ <strong>{{ t.qty }}</strong> → <strong class="text-success">{{ t.price }}</strong></li>
+                    {% endfor %}
+                    </ul>
+                  </div>
+                  {% endif %}
+                {% endif %}
+              </td>
               <td class="{% if inv.tooling_cost %}fw-bold text-info{% endif %}">{{ inv.tooling_cost or '—' }}</td>
               <td>{{ inv.lead_time_days or '—' }}</td>
               <td class="text-muted">{{ inv.quote_comment or '—' }}</td>
@@ -449,17 +478,36 @@
                 <i class="bi bi-check-circle-fill text-success"></i>
                 {% endif %}
               </td>
-              <td>
+              <td class="text-nowrap">
                 {% if _can_reply %}
                 {% if _saved %}
-                <button form="reply-form-{{ inv.id }}" type="submit" class="btn btn-sm btn-outline-success">
+                <button form="reply-form-{{ inv.id }}" type="submit" class="btn btn-sm btn-outline-success mb-1">
                   <i class="bi bi-arrow-repeat"></i> 更新
                 </button>
                 {% else %}
-                <button form="reply-form-{{ inv.id }}" type="submit" class="btn btn-sm btn-primary">
+                <button form="reply-form-{{ inv.id }}" type="submit" class="btn btn-sm btn-primary mb-1">
                   <i class="bi bi-check-lg"></i> 儲存
                 </button>
                 {% endif %}
+                {% endif %}
+                {% if user.role.value in ('engineer','admin') and form.status.value in ('QUOTING','QUOTES_COLLECTED','ENG_DISPATCH') %}
+                <div class="btn-group btn-group-sm mt-1" role="group">
+                  {% if form.status.value in ('QUOTING','QUOTES_COLLECTED') %}
+                  <button type="button" class="btn btn-outline-info invite-resend-btn"
+                          data-inv-id="{{ inv.id }}"
+                          data-supplier="{{ inv.supplier.name if inv.supplier else '' }}"
+                          title="重新寄送詢價信給此供應商">
+                    <i class="bi bi-envelope-arrow-up"></i>
+                  </button>
+                  {% endif %}
+                  <button type="button" class="btn btn-outline-danger invite-delete-btn"
+                          data-inv-id="{{ inv.id }}"
+                          data-supplier="{{ inv.supplier.name if inv.supplier else '' }}"
+                          data-process="{{ inv.process_name or '' }}"
+                          title="刪除此派發列（連同已上傳報價附件）">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
                 {% endif %}
               </td>
             </tr>
@@ -479,7 +527,7 @@
                 <th style="min-width:150px">備註</th>
                 <th style="min-width:180px">報價單附件</th>
                 <th style="min-width:45px">選用</th>
-                <th style="min-width:70px"></th>
+                <th style="min-width:130px">操作</th>
               </tr>
             </thead>
           {% endmacro %}
@@ -1416,23 +1464,23 @@
           </form>
           {% endif %}
 
-          {# 工程：QUOTING 階段若業務新增了圖紙（沒有對應 invite），可重開派發補加 #}
+          {# 工程：QUOTING 階段可重開詢價派發（新增圖紙 / 補派供應商）#}
           {% if form.status.value == 'QUOTING' and user.role.value in ('engineer','admin') %}
             {% set _drawing_docs = form.documents | selectattr('category', 'equalto', '圖面') | list %}
             {% set _invited_dids = form.invites | map(attribute='drawing_doc_id') | select | list %}
             {% set _new_drawings = _drawing_docs | rejectattr('id', 'in', _invited_dids) | list %}
-            {% if _new_drawings %}
             <form method="post" action="/npi-forms/{{ form.form_id }}/reopen-dispatch" class="mb-2"
-                  onsubmit="return confirm('將狀態退回「待工程派發」以加派新圖紙的詢價，已派發的供應商列不變。確認？');">
+                  onsubmit="return confirm('將狀態退回「待工程派發」以加派詢價，已派發的供應商列不變。確認？');">
+              {% if _new_drawings %}
               <div class="alert alert-warning small mb-1 py-2">
                 <i class="bi bi-exclamation-triangle me-1"></i>
                 偵測到 <strong>{{ _new_drawings|length }}</strong> 張新圖紙尚未派發
               </div>
+              {% endif %}
               <button class="btn btn-warning w-100">
-                <i class="bi bi-arrow-counterclockwise me-1"></i>重開詢價派發（補派新圖紙）
+                <i class="bi bi-arrow-counterclockwise me-1"></i>重開詢價派發{% if _new_drawings %}（補派新圖紙）{% else %}（追加供應商 / 圖紙）{% endif %}
               </button>
             </form>
-            {% endif %}
           {% endif %}
 
           {# 採購/工程宣告報價收齊 #}
@@ -1466,6 +1514,13 @@
               and user.role.value in ('sales','admin') %}
           <button class="btn btn-warning w-100 mb-2" data-bs-toggle="modal" data-bs-target="#submitQuoteBuModal">
             <i class="bi bi-calculator me-1"></i>上線試算 + 送 BU 審核報價
+          </button>
+          {% endif %}
+
+          {# 業務：退回工程/採購調整報價 / 補附件 #}
+          {% if form.status.value == 'QUOTES_COLLECTED' and user.role.value in ('sales','admin') %}
+          <button class="btn btn-outline-danger w-100 mb-2" data-bs-toggle="modal" data-bs-target="#salesReturnModal">
+            <i class="bi bi-arrow-return-left me-1"></i>退回工程 / 採購補件（調整報價）
           </button>
           {% endif %}
 
@@ -1790,6 +1845,35 @@
 
 {# ───── Modals ───── #}
 
+{# 業務退回工程/採購補件（QUOTES_COLLECTED → QUOTING） #}
+{% if form.status.value == 'QUOTES_COLLECTED' and user.role.value in ('sales','admin') %}
+<div class="modal fade" id="salesReturnModal" tabindex="-1">
+  <div class="modal-dialog">
+    <form class="modal-content" method="post" action="/npi-forms/{{ form.form_id }}/sales-return-to-eng">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title"><i class="bi bi-arrow-return-left me-2"></i>退回工程 / 採購補件</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-warning small mb-3">
+          <i class="bi bi-info-circle me-1"></i>
+          按下確認後，本單會退回至 <strong>QUOTING（供應商報價中）</strong>，工程 / 採購可調整供應商報價、附件、階梯式 MOQ 等資訊；調整完成後再次按「報價收齊」交回業務試算。
+        </div>
+        <label class="form-label fw-semibold">退回原因 / 需要調整的項目 <span class="text-danger">*</span></label>
+        <textarea name="comment" rows="5" class="form-control" required
+                  placeholder="例：&#10;1. 凌陽 報價請補階梯式 MOQ（500 / 1000 / 5000）&#10;2. 久盛塑膠 模具費需附正式報價單 PDF&#10;3. 髮線製程交期請再確認"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="submit" class="btn btn-danger">
+          <i class="bi bi-arrow-return-left me-1"></i>確認退回
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
 {# 工程退回業務補件 #}
 {% if form.status.value == 'ENG_DISPATCH' and user.role.value in ('engineer','admin') %}
 <div class="modal fade" id="engReturnModal" tabindex="-1">
@@ -1885,12 +1969,24 @@
           <option value="C1100">
         </datalist>
 
+        {# 自動隱藏「已派發過」的圖紙：drawing_doc_id 已在 invites 內 #}
+        {% set _dispatched_dids = form.invites | map(attribute='drawing_doc_id') | select | list %}
+        {% set _pending_drawings = (drawings or []) | rejectattr('id', 'in', _dispatched_dids) | list %}
+
         {# 每張圖一張獨立製程表 — 若無圖則 fallback 到單一共用表 #}
         {% if drawings %}
+          {% if not _pending_drawings %}
+          <div class="alert alert-info small mb-2 py-2">
+            <i class="bi bi-info-circle me-1"></i>本單所有圖紙都已派發過。若需補派，請先在<strong>附件</strong>區上傳新圖紙後再開此視窗。
+          </div>
+          {% else %}
         <div class="small text-muted mb-2">
           <i class="bi bi-info-circle me-1"></i>每張圖紙有獨立的製程排序表。同一製程可指定多家供應商做比價（於該圖紙的表內多新增一列）。
+          {% if _dispatched_dids %}
+          <span class="badge bg-secondary ms-1">已派發 {{ _dispatched_dids|unique|list|length }} 張不再列出</span>
+          {% endif %}
         </div>
-        {% for d in drawings %}
+        {% for d in _pending_drawings %}
         {% set ext = (d.original_name.rsplit('.',1)[-1] | lower) if '.' in d.original_name else '' %}
         <div class="border rounded p-3 mb-3 drawing-block"
              data-drawing-id="{{ d.id }}"
@@ -1929,6 +2025,11 @@
                      data-doc-id="{{ d.id }}"
                      accept=".pdf,.dwg,.dxf,.png,.jpg,.jpeg,.gif,.webp">
             </label>
+            <button type="button" class="btn btn-sm btn-outline-danger remove-drawing-btn"
+                    data-doc-id="{{ d.id }}" data-name="{{ d.original_name }}"
+                    title="從本單刪除此圖紙（不可復原）">
+              <i class="bi bi-trash"></i>
+            </button>
             <button type="button" class="btn btn-sm btn-outline-primary add-row-btn">
               <i class="bi bi-plus"></i> 新增製程列
             </button>
@@ -1959,6 +2060,7 @@
           </table>
         </div>
         {% endfor %}
+          {% endif %}
         {% else %}
         {# 無圖面上傳 → 單一共用表 #}
         <div class="row g-2 mb-3">
@@ -2075,6 +2177,30 @@
     const tbody = block.querySelector('.drawing-rows');
     if (tbody && !tbody.querySelector('tr.dispatch-row')) {
       addRowToBlock(block); addRowToBlock(block);
+    }
+  });
+
+  // ── 刪除圖紙（從本單永久移除）──
+  document.addEventListener('click', async (e) => {
+    const btn = e.target.closest('#dispatchModal .remove-drawing-btn');
+    if (!btn) return;
+    const docId = btn.dataset.docId;
+    const name = btn.dataset.name || '此圖紙';
+    if (!confirm(`確定刪除「${name}」？此圖將從本 NPI 單永久移除（不可復原）。`)) return;
+    btn.disabled = true;
+    try {
+      const resp = await fetch(`/npi-forms/{{ form.form_id }}/delete-doc/${docId}`, {
+        method: 'POST', redirect: 'manual'
+      });
+      if (resp.ok || resp.type === 'opaqueredirect') {
+        const block = btn.closest('.drawing-block');
+        if (block) block.remove();
+      } else {
+        throw new Error('狀態 ' + resp.status);
+      }
+    } catch(err) {
+      alert('刪除失敗：' + err.message);
+      btn.disabled = false;
     }
   });
 
@@ -2352,6 +2478,54 @@
       // 最後一欄（備註）→ 自動開啟該列的檔案選擇視窗
       const fileInp = tr.querySelector('input[type="file"]');
       if (fileInp) fileInp.click();
+    }
+  });
+
+  // ── 工程：刪除單一派發列 ──
+  document.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.invite-delete-btn');
+    if (!btn) return;
+    const invId = btn.dataset.invId;
+    const sup   = btn.dataset.supplier || '此供應商';
+    const proc  = btn.dataset.process  || '—';
+    if (!confirm(`確定刪除派發列：${sup} / ${proc}？\n已上傳的報價附件也會一併移除（不可復原）。`)) return;
+    btn.disabled = true;
+    try {
+      const resp = await fetch(`/npi-forms/{{ form.form_id }}/invite/${invId}/delete`, {
+        method: 'POST', redirect: 'manual'
+      });
+      const j = await resp.json().catch(() => ({}));
+      if (!resp.ok || !j.ok) throw new Error(j.detail || resp.statusText);
+      const tr = btn.closest('tr');
+      if (tr) tr.remove();
+    } catch(err) {
+      alert('刪除失敗：' + err.message);
+      btn.disabled = false;
+    }
+  });
+
+  // ── 工程：重發單筆詢價信 ──
+  document.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.invite-resend-btn');
+    if (!btn) return;
+    const invId = btn.dataset.invId;
+    const sup   = btn.dataset.supplier || '此供應商';
+    if (!confirm(`重新寄送詢價信給：${sup}？`)) return;
+    btn.disabled = true;
+    const oldHTML = btn.innerHTML;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+    try {
+      const resp = await fetch(`/npi-forms/{{ form.form_id }}/invite/${invId}/resend`, {
+        method: 'POST'
+      });
+      const j = await resp.json().catch(() => ({}));
+      if (!resp.ok || !j.ok) throw new Error(j.detail || resp.statusText);
+      btn.innerHTML = '<i class="bi bi-check-lg text-success"></i>';
+      setTimeout(() => location.reload(), 600);
+    } catch(err) {
+      alert('重發失敗：' + err.message);
+      btn.innerHTML = oldHTML;
+      btn.disabled = false;
     }
   });
 
@@ -2721,6 +2895,31 @@
     {% endfor %}
     return m;
   })();
+  // 階梯式 MOQ 對應表：key 同上 → [{qty, price, supplier}, ...]
+  const inviteTiers = (function(){
+    const m = {};
+    {% for inv in form.invites %}
+      {% if inv.tier_data and inv.process_name %}
+      (function(){
+        try {
+          const tiers = {{ inv.tier_data | tojson }} ? JSON.parse({{ inv.tier_data | tojson }}) : null;
+          if (Array.isArray(tiers) && tiers.length) {
+            const k = `{{ inv.drawing_doc_id or 0 }}||{{ inv.process_name }}`;
+            if (!m[k]) m[k] = [];
+            tiers.forEach(t => m[k].push({
+              qty: Number(t.qty) || 0,
+              price: Number(t.price) || 0,
+              supplier: {{ (inv.supplier.name if inv.supplier else '') | tojson }}
+            }));
+          }
+        } catch(_) {}
+      })();
+      {% endif %}
+    {% endfor %}
+    // 各 key 內 MOQ 由小到大
+    Object.keys(m).forEach(k => m[k].sort((a, b) => a.qty - b.qty));
+    return m;
+  })();
   // 模治具費用對應表：按 drawing_id 加總（同圖多家供應商加總後給業務做為預設值，可覆寫）
   const toolingByDrawing = (function(){
     const m = {};
@@ -2770,6 +2969,15 @@
     const ks = `0||${processName}`;
     return invitePrices[ks] != null ? invitePrices[ks] : null;
   }
+  function tiersFor(drawingId, processName) {
+    if (!processName) return null;
+    if (drawingId != null) {
+      const k = `${drawingId}||${processName}`;
+      if (inviteTiers[k] && inviteTiers[k].length) return inviteTiers[k];
+    }
+    const ks = `0||${processName}`;
+    return (inviteTiers[ks] && inviteTiers[ks].length) ? inviteTiers[ks] : null;
+  }
   function buildProcRow(name, prices) {
     const tr = document.createElement('tr');
     tr.className = 'proc-row';
@@ -2781,7 +2989,20 @@
         const auto = priceFor(colDrawingId(i), name);
         if (auto != null) v = auto;
       }
-      html += `<td><input type="number" step="any" class="form-control form-control-sm p-price" data-col="${i}" value="${v}"></td>`;
+      const tiers = name ? tiersFor(colDrawingId(i), name) : null;
+      let tierSel = '';
+      if (tiers && tiers.length) {
+        const opts = tiers.map(t => `<option value="${t.price}">≥${t.qty} → ${t.price}</option>`).join('');
+        tierSel = `<select class="form-select form-select-sm tier-pick mt-1"
+                            data-col="${i}" style="font-size:11px;padding:.1rem .4rem">
+                     <option value="">— 階梯 ${tiers.length} 段（點選帶入）—</option>
+                     ${opts}
+                   </select>`;
+      }
+      html += `<td>
+        <input type="number" step="any" class="form-control form-control-sm p-price" data-col="${i}" value="${v}">
+        ${tierSel}
+      </td>`;
     }
     tr.innerHTML = html;
     return tr;
@@ -2933,6 +3154,20 @@
   });
   document.addEventListener('input', e => {
     if (e.target.closest('#submitQuoteBuModal')) recalc();
+  });
+  // 階梯下拉 → 帶入該欄 p-price 並重算
+  document.addEventListener('change', e => {
+    const sel = e.target;
+    if (!sel.classList.contains('tier-pick')) return;
+    if (!sel.closest('#submitQuoteBuModal')) return;
+    const v = sel.value;
+    if (!v) return;
+    const td = sel.closest('td');
+    const inp = td && td.querySelector('.p-price');
+    if (inp) {
+      inp.value = v;
+      inp.dispatchEvent(new Event('input', {bubbles: true}));
+    }
   });
   // Enter → 同欄下一列（連續輸入單價不觸發送出）
   document.addEventListener('keydown', e => {
@@ -3195,6 +3430,116 @@
         '<div class="late-msg"><i class="bi bi-exclamation-triangle me-1"></i>晚於客戶需求</div>');
     } else {
       span.classList.add('text-success', 'fw-semibold');
+    }
+  });
+})();
+</script>
+
+{# 階梯式 MOQ 編輯 modal（單一 modal，所有 invite 共用） #}
+<div class="modal fade" id="tierModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title"><i class="bi bi-bar-chart-steps me-2"></i>階梯式 MOQ 報價</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-info small mb-2 py-2">
+          <i class="bi bi-info-circle me-1"></i>依不同 MOQ 階梯給對應單價（最低 MOQ 那筆會自動同步為主單價）。
+        </div>
+        <table class="table table-sm align-middle mb-2">
+          <thead class="table-light">
+            <tr>
+              <th style="width:40%">MOQ（≥ 數量）</th>
+              <th style="width:40%">單價</th>
+              <th style="width:20%"></th>
+            </tr>
+          </thead>
+          <tbody id="tierRows"></tbody>
+        </table>
+        <button type="button" class="btn btn-sm btn-outline-primary" id="tierAddBtn">
+          <i class="bi bi-plus"></i> 新增階梯
+        </button>
+        <div id="tierMsg" class="small mt-2"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="button" class="btn btn-primary" id="tierSaveBtn">
+          <i class="bi bi-check-lg me-1"></i>儲存階梯
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+  const modalEl = document.getElementById('tierModal');
+  if (!modalEl) return;
+  const rowsEl  = document.getElementById('tierRows');
+  const addBtn  = document.getElementById('tierAddBtn');
+  const saveBtn = document.getElementById('tierSaveBtn');
+  const msgEl   = document.getElementById('tierMsg');
+  let curInvId = null;
+
+  function addRow(qty='', price='') {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="number" class="form-control form-control-sm tier-qty" value="${qty}" min="1" placeholder="例 100"></td>
+      <td><input type="number" step="0.01" class="form-control form-control-sm tier-price" value="${price}" placeholder="單價"></td>
+      <td><button type="button" class="btn btn-sm btn-outline-danger tier-del">
+        <i class="bi bi-x"></i></button></td>`;
+    rowsEl.appendChild(tr);
+  }
+
+  rowsEl.addEventListener('click', (e) => {
+    if (e.target.closest('.tier-del')) e.target.closest('tr').remove();
+  });
+  addBtn.addEventListener('click', () => addRow());
+
+  // 開啟 modal：載入指定 invite 的 tier_data
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.tier-edit-btn');
+    if (!btn) return;
+    curInvId = btn.dataset.invId;
+    rowsEl.innerHTML = '';
+    msgEl.textContent = '';
+    let tiers = [];
+    try {
+      const raw = btn.dataset.tierData || '';
+      if (raw) tiers = JSON.parse(raw);
+    } catch(_) {}
+    if (!tiers.length) {
+      addRow(); addRow();
+    } else {
+      tiers.forEach(t => addRow(t.qty || '', t.price || ''));
+    }
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+  });
+
+  saveBtn.addEventListener('click', async () => {
+    const tiers = [];
+    rowsEl.querySelectorAll('tr').forEach(tr => {
+      const q = parseFloat(tr.querySelector('.tier-qty').value);
+      const p = parseFloat(tr.querySelector('.tier-price').value);
+      if (!isNaN(q) && !isNaN(p) && q > 0 && p >= 0) tiers.push({qty: q, price: p});
+    });
+    // 排序：MOQ 由小到大
+    tiers.sort((a, b) => a.qty - b.qty);
+    saveBtn.disabled = true;
+    msgEl.innerHTML = '<span class="text-muted">儲存中…</span>';
+    try {
+      const fd = new FormData();
+      fd.append('tier_data', tiers.length ? JSON.stringify(tiers) : '');
+      const resp = await fetch(`/npi-forms/{{ form.form_id }}/invite/${curInvId}/save-tiers`, {
+        method:'POST', body: fd
+      });
+      const j = await resp.json().catch(() => ({}));
+      if (!resp.ok || !j.ok) throw new Error(j.detail || resp.statusText);
+      msgEl.innerHTML = '<span class="text-success"><i class="bi bi-check-circle me-1"></i>已儲存，重新整理頁面…</span>';
+      setTimeout(() => location.reload(), 600);
+    } catch(err) {
+      msgEl.innerHTML = '<span class="text-danger">' + err.message + '</span>';
+      saveBtn.disabled = false;
     }
   });
 })();

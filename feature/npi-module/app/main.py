@@ -97,6 +97,8 @@ async def run_migrations():
         "ALTER TABLE npi_supplier_invites ADD COLUMN expected_lead_days INTEGER",
         "ALTER TABLE npi_supplier_invites ADD COLUMN drawing_doc_id INTEGER",
         "ALTER TABLE npi_supplier_invites ADD COLUMN tooling_cost FLOAT",
+        # 階梯式 MOQ 報價（JSON：[{"qty":100,"price":500}, {"qty":500,"price":450}]）
+        "ALTER TABLE npi_supplier_invites ADD COLUMN tier_data TEXT",
         # NPI 業務工作區 — 每張圖 T1 試模計畫 JSON
         "ALTER TABLE npi_forms ADD COLUMN t1_plan_data TEXT",
         # NPI 工程工作區 — 每站廠內料號/是否走途程 JSON

@@ -118,6 +118,7 @@ class NPISupplierInvite(Base):
     lead_time_days = Column(Integer, nullable=True)
     quote_comment  = Column(Text, nullable=True)
     is_selected    = Column(Boolean, default=False)     # NPI 最終選用
+    tier_data      = Column(Text, nullable=True)        # 階梯式 MOQ JSON：[{"qty":100,"price":500},...]
 
     form           = relationship("NPIForm", back_populates="invites")
     supplier       = relationship("Supplier", foreign_keys=[supplier_id])
